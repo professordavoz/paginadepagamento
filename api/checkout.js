@@ -1,41 +1,54 @@
-const ASAAS_BASE = 'https://api.asaas.com/v3';
+const https = require('https');
 
-export default async function handler(req, res) {
-    const key = process.env.ASAAS_API_KEY;
+export default function handler(req, res) {
+    // Libera o acesso para o navegador não bloquear nada
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
 
-    if (!key) {
-        return res.status(500).json({ error: "Chave ASAAS_API_KEY não encontrada na Vercel" });
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
-    const { action, payload } = req.body;
+    const key = process.env.ASAAS_API_KEY ? process.env.ASAAS_API_KEY.trim() : null;
+    const { action, payload } = req.body || {};
 
-    try {
-        let url = ASAAS_BASE;
-        let method = 'POST';
+    let path = '/v3';
+    let method = 'GET';
 
-        if (action === 'create_customer') url += '/customers';
-        else if (action === 'create_payment') url += '/payments';
-        else if (action === 'pix_qrcode') {
-            url += `/payments/${payload.paymentId}/pixQrCode`;
-            method = 'GET';
+    // Define o caminho correto baseado na ação do site
+    if (action === 'create_customer') { path += '/customers'; method = 'POST'; }
+    else if (action === 'create_payment') { path += '/payments'; method = 'POST'; }
+    else if (action === 'pix_qrcode') { path += `/payments/${payload.paymentId}/pixQrCode`; }
+    else if (action === 'check_status') { path += `/payments/${payload.paymentId}`; }
+    else if (action === 'check_global') { path += `/payments?cpfCnpj=${payload.cpfCnpj}&status=RECEIVED,CONFIRMED`; }
+
+    const options = {
+        hostname: 'api.asaas.com',
+        path: path,
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'access_token': key
         }
-        else if (action === 'check_status') {
-            url += `/payments/${payload.paymentId}`;
-            method = 'GET';
-        }
+    };
 
-        const response = await fetch(url, {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'access_token': key.trim() // O .trim() remove espaços invisíveis que causam erro
-            },
-            body: method === 'POST' ? JSON.stringify(payload) : null
+    const request = https.request(options, (response) => {
+        let data = '';
+        response.on('data', (chunk) => { data += chunk; });
+        response.on('end', () => {
+            try {
+                res.status(200).json(JSON.parse(data));
+            } catch (e) {
+                res.status(200).json({ status: "ok", raw: data });
+            }
         });
+    });
 
-        const data = await response.json();
-        return res.status(200).json(data);
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
+    request.on('error', (err) => {
+        res.status(500).json({ error: err.message });
+    });
+
+    if (method === 'POST' && payload) {
+        request.write(JSON.stringify(payload));
     }
+    request.end();
 }
