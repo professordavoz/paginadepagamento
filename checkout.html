@@ -6,7 +6,7 @@
         const btn = document.getElementById('btn');
         const nome = document.getElementById('nome').value;
         const email = document.getElementById('email').value;
-        // Limpa CPF para garantir que a busca no Asaas funcione perfeitamente
+        // Limpa CPF para garantir a busca no Asaas
         const cpfLimpo = document.getElementById('cpf').value.replace(/\D/g, '');
 
         if (!email || !cpfLimpo) {
@@ -18,25 +18,23 @@
         btn.disabled = true;
 
         try {
-            // 1. CONFERÊNCIA REAL: Busca no histórico do Asaas
+            // 1. Busca no histórico do Asaas (Agora com a rota dupla que consertamos)
             const busca = await call('/api/checkout', { 
                 action: 'check_global', 
                 payload: { cpfCnpj: cpfLimpo } 
             });
 
-            console.log("Status da busca no Asaas:", busca); // Salva o registro no console
-
-            // 2. Trava Rígida: Verifica se existe o array 'data' e se há pagamento aprovado
+            // 2. Trava de segurança rígida: SÓ passa se o Asaas confirmar que o dinheiro caiu
             if (busca && busca.data && Array.isArray(busca.data)) {
                 const jaEstaPago = busca.data.some(p => p.status === 'RECEIVED' || p.status === 'CONFIRMED');
                 
                 if (jaEstaPago) {
                     redirecionarSucesso();
-                    return; // Aborta o código AQUI. Não deixa gerar o QR Code novo.
+                    return; // Aborta a geração de um novo PIX e manda direto pro curso
                 }
             }
 
-            // 3. Só cria se passou pela trava e não tem pagamento confirmado
+            // 3. Se não achou pagamento PAGO, cria um novo (Por isso você viu o QR Code)
             status.innerHTML = "Identificando cadastro...";
             const cli = await call('/api/checkout', { 
                 action: 'create_customer', 
@@ -77,4 +75,20 @@
                     redirecionarSucesso();
                 }
             } catch (e) {
-                console.error("Erro na vigia
+                console.error("Erro na vigia:", e);
+            }
+        }, 5000);
+    }
+
+    function redirecionarSucesso() {
+        document.getElementById('status').innerHTML = `<h2 style="color:#00ff00">PAGAMENTO IDENTIFICADO!</h2><p>Redirecionando...</p>`;
+        setTimeout(() => {
+            window.location.href = "https://vocal-divine-flow.lovable.app/obrigado";
+        }, 2000);
+    }
+
+    async function call(url, body) {
+        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        return await r.json();
+    }
+</script>
