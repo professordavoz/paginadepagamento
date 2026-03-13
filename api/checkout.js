@@ -14,8 +14,13 @@ export default async function handler(req, res) {
         let url = ASAAS_BASE;
         let method = 'POST';
 
-        if (action === 'check_existing') {
-            url = `${ASAAS_BASE}/payments?customer=${payload.customerId}&status=RECEIVED,CONFIRMED`;
+        // BUSCA DIRETA POR PAGAMENTO JÁ REALIZADO (CPF OU EMAIL)
+        if (action === 'check_global') {
+            const identificador = payload.cpfCnpj || payload.email;
+            url = `${ASAAS_BASE}/payments?status=RECEIVED,CONFIRMED&limit=1`;
+            // Se tiver CPF, buscamos por ele, se não, por e-mail
+            if (payload.cpfCnpj) url += `&cpfCnpj=${payload.cpfCnpj}`;
+            else url += `&email=${payload.email}`;
             method = 'GET';
         }
         else if (action === 'create_customer') url += '/customers';
