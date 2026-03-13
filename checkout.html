@@ -1,111 +1,56 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout - Academia da Voz</title>
-    <style>
-        body { font-family: sans-serif; background: #000; color: #fff; display: flex; justify-content: center; padding: 20px; margin: 0; }
-        .card { background: #111; padding: 30px; border-radius: 15px; width: 100%; max-width: 400px; border: 1px solid #333; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: #ff3b3b; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        #status { margin-top: 20px; }
-        .qr-box { background: #fff; color: #000; padding: 20px; border-radius: 12px; margin-top: 20px; }
-        .pix-copia { background: #eee; padding: 10px; font-size: 11px; word-break: break-all; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: monospace; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2 id="titulo">Finalizar Compra</h2>
-        <div id="form-container">
-            <p>Valor: R$ 35,00</p>
-            <input type="text" id="nome" placeholder="Nome Completo">
-            <input type="email" id="email" placeholder="E-mail">
-            <input type="text" id="cpf" placeholder="CPF (apenas números)">
-            <button id="btn" onclick="processarFluxo()">FINALIZAR COMPRA</button>
-        </div>
-        <div id="status"></div>
-    </div>
+async function processarFluxo() {
+    const status = document.getElementById('status');
+    const btn = document.getElementById('btn');
+    const email = document.getElementById('email').value;
+    const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
 
-    <script>
-        let vigia;
+    if (!email || !cpf) {
+        status.innerHTML = `<b style="color:yellow">Preencha e-mail e CPF!</b>`;
+        return;
+    }
 
-        async function processarFluxo() {
-            const status = document.getElementById('status');
-            const btn = document.getElementById('btn');
-            const nome = document.getElementById('nome').value;
-            const email = document.getElementById('email').value;
-            const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
+    status.innerHTML = "Verificando se você já possui acesso...";
+    btn.disabled = true;
 
-            if (!nome || !email || !cpf) {
-                status.innerHTML = `<b style="color:yellow">Preencha todos os campos!</b>`;
-                return;
-            }
+    try {
+        // 1. CONFERE GLOBALMENTE SE ESSE CPF/EMAIL JÁ PAGOU
+        const conferência = await call('/api/checkout', { 
+            action: 'check_global', 
+            payload: { cpfCnpj: cpf, email: email } 
+        });
 
-            status.innerHTML = "Verificando cadastro...";
-            btn.disabled = true;
-
-            try {
-                // 1. Criar ou Localizar Cliente
-                const cli = await call('/api/checkout', { action: 'create_customer', payload: { name: nome, email: email, cpfCnpj: cpf } });
-                
-                // 2. Verificar se já existe pagamento pago
-                status.innerHTML = "Conferindo pagamentos...";
-                const hist = await call('/api/checkout', { action: 'check_existing', payload: { customerId: cli.id } });
-
-                if (hist.data && hist.data.length > 0) {
-                    redirecionar();
-                    return;
-                }
-
-                // 3. Gerar Novo PIX
-                status.innerHTML = "Gerando QR Code...";
-                const pag = await call('/api/checkout', { 
-                    action: 'create_payment', 
-                    payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
-                });
-                const qr = await call('/api/checkout', { action: 'pix_qrcode', payload: { paymentId: pag.id } });
-
-                document.getElementById('form-container').style.display = 'none';
-                document.getElementById('titulo').innerText = "Aguardando PIX";
-                status.innerHTML = `
-                    <div class="qr-box">
-                        <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%">
-                        <div class="pix-copia">${qr.payload}</div>
-                        <p style="color:blue; font-weight:bold;">Vigiando pagamento...</p>
-                    </div>`;
-
-                iniciarVigia(pag.id);
-
-            } catch (err) {
-                status.innerHTML = `<b style="color:red">Erro: ${err.message}</b>`;
-                btn.disabled = false;
-            }
+        if (conferência.data && conferência.data.length > 0) {
+            redirecionar();
+            return;
         }
 
-        function iniciarVigia(paymentId) {
-            if (vigia) clearInterval(vigia);
-            vigia = setInterval(async () => {
-                const res = await call('/api/checkout', { action: 'check_status', payload: { paymentId } });
-                if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
-                    clearInterval(vigia);
-                    redirecionar();
-                }
-            }, 5000);
-        }
+        // 2. Se não pagou, segue para criar cliente e pagamento
+        status.innerHTML = "Identificando cadastro...";
+        const cli = await call('/api/checkout', { 
+            action: 'create_customer', 
+            payload: { name: document.getElementById('nome').value, email: email, cpfCnpj: cpf } 
+        });
+        
+        status.innerHTML = "Gerando seu QR Code...";
+        const pag = await call('/api/checkout', { 
+            action: 'create_payment', 
+            payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
+        });
 
-        function redirecionar() {
-            document.getElementById('status').innerHTML = `<h2 style="color:#00ff00">PAGAMENTO CONFIRMADO!</h2>`;
-            setTimeout(() => {
-                window.location.href = "https://vocal-divine-flow.lovable.app/obrigado";
-            }, 2000);
-        }
+        const qr = await call('/api/checkout', { action: 'pix_qrcode', payload: { paymentId: pag.id } });
 
-        async function call(url, body) {
-            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            return await r.json();
-        }
-    </script>
-</body>
-</html>
+        document.getElementById('form-container').style.display = 'none';
+        status.innerHTML = `
+            <div class="qr-box">
+                <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%">
+                <div class="pix-copia">${qr.payload}</div>
+                <p>Aguardando pagamento...</p>
+            </div>`;
+
+        iniciarVigia(pag.id);
+
+    } catch (err) {
+        status.innerHTML = `<b style="color:red">Erro: ${err.message}</b>`;
+        btn.disabled = false;
+    }
+}
