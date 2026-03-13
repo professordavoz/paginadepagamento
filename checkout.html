@@ -14,7 +14,7 @@
         .qr-box { background: #fff; color: #000; padding: 20px; border-radius: 12px; margin-top: 20px; }
         .qr-box img { width: 100%; max-width: 250px; display: block; margin: 0 auto; }
         .pix-copia { background: #eee; padding: 10px; font-size: 11px; word-break: break-all; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: monospace; }
-        .sucesso { color: #00ff00; font-weight: bold; font-size: 18px; margin-top: 20px; }
+        .confirmado { color: #00ff00; font-weight: bold; font-size: 18px; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -63,10 +63,9 @@
                         <img src="data:image/png;base64,${qr.encodedImage}">
                         <p style="font-weight:bold; margin-top:10px;">Copia e Cola:</p>
                         <div class="pix-copia">${qr.payload}</div>
-                        <p style="font-size:12px; color:#666; margin-top:15px;">Vigiando pagamento em tempo real...</p>
+                        <p style="font-size:12px; color:#666; margin-top:15px;">Confirmando pagamento em tempo real...</p>
                     </div>`;
 
-                // Inicia a verificação automática a cada 5 segundos
                 iniciarVerificacao(pag.id);
 
             } catch (err) {
@@ -78,31 +77,23 @@
         function iniciarVerificacao(paymentId) {
             checkInterval = setInterval(async () => {
                 try {
-                    // Chamamos uma nova ação no backend para checar o status
-                    const check = await fetch('/api/checkout', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'check_status', payload: { paymentId } })
-                    });
-                    const res = await check.json();
+                    const res = await callAPI('check_status', { paymentId });
 
                     if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
                         clearInterval(checkInterval);
                         document.getElementById('status').innerHTML = `
-                            <div class="sucesso">
+                            <div class="confirmado">
                                 ✅ PAGAMENTO CONFIRMADO!<br>
-                                <p style="color:#fff; font-size:14px;">Redirecionando para o curso...</p>
+                                <p style="color:#fff; font-size:14px;">Redirecionando...</p>
                             </div>`;
                         
-                        // REDIRECIONAMENTO: Coloque o link do seu curso ou ebook aqui
+                        // REDIRECIONAMENTO AUTOMÁTICO PARA SUA PÁGINA DA LOVABLE
                         setTimeout(() => {
-                            window.location.href = "https://seulinkdeentrega.com.br";
-                        }, 3000);
+                            window.location.href = "https://vocal-divine-flow.lovable.app/obrigado";
+                        }, 2000);
                     }
-                } catch (e) {
-                    console.log("Erro ao checar status");
-                }
-            }, 5000); // 5 segundos
+                } catch (e) { console.log("Erro ao checar"); }
+            }, 5000);
         }
 
         async function callAPI(action, payload) {
