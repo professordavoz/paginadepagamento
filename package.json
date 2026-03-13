@@ -1,0 +1,6 @@
+{
+  "name": "destrave-vocal-checkout",
+  "version": "1.0.0",
+  "description": "Checkout Asaas — Kadu Vieira",
+  "engines": { "node": "18.x" }
+}
