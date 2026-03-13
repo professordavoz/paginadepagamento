@@ -526,7 +526,12 @@ async function api(action, payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, payload })
   });
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch(e) {
+    throw new Error('Resposta inválida do servidor (status ' + res.status + ')');
+  }
   if (!res.ok) throw new Error(data.error || 'Erro no servidor');
   return data;
 }
