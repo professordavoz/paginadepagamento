@@ -8,9 +8,7 @@ export default async function handler(req, res) {
     const key = process.env.ASAAS_API_KEY;
     const { action, payload } = req.body || {};
 
-    if (!key) {
-        return res.status(200).json({ error: "ERRO: Chave ASAAS_API_KEY não encontrada na Vercel." });
-    }
+    if (!key) return res.status(200).json({ error: "Chave não configurada na Vercel." });
 
     try {
         let url = 'https://api.asaas.com/api/v3';
@@ -36,6 +34,6 @@ export default async function handler(req, res) {
         return res.status(200).json(data);
 
     } catch (err) {
-        return res.status(200).json({ error: "Erro: " + err.message });
+        return res.status(200).json({ error: err.message });
     }
 }
