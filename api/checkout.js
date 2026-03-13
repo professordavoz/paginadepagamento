@@ -1,7 +1,5 @@
-import https from 'https';
-
-export default function handler(req, res) {
-    // 1. Libera o acesso para o navegador na hora
+module.exports = async function handler(req, res) {
+    // 1. Libera o CORS na hora (Evita o "Erro no network")
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
@@ -9,62 +7,50 @@ export default function handler(req, res) {
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     const key = process.env.ASAAS_API_KEY ? process.env.ASAAS_API_KEY.trim() : null;
+    if (!key) return res.status(200).json({ error: "Chave ausente" });
 
-    if (!key) {
-        return res.status(200).json({ error: "Chave ausente na Vercel" });
+    // 2. O PULO DO GATO: Força a leitura dos dados mesmo se o site mandar como texto
+    let body = req.body;
+    if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) { body = {}; }
     }
+    body = body || {};
 
-    const body = req.body || {};
     const action = body.action;
     const payload = body.payload || {};
 
-    let path = '/v3';
+    let url = 'https://api.asaas.com/v3';
     let method = 'GET';
 
-    // 2. Monta o caminho correto para o Asaas
-    if (action === 'create_customer') { path += '/customers'; method = 'POST'; }
-    else if (action === 'create_payment') { path += '/payments'; method = 'POST'; }
-    else if (action === 'pix_qrcode' && payload.paymentId) { path += `/payments/${payload.paymentId}/pixQrCode`; }
-    else if (action === 'check_status' && payload.paymentId) { path += `/payments/${payload.paymentId}`; }
-    else if (action === 'check_global' && payload.cpfCnpj) {
+    if (action === 'create_customer') { 
+        url += '/customers'; method = 'POST'; 
+    } else if (action === 'create_payment') { 
+        url += '/payments'; method = 'POST'; 
+    } else if (action === 'pix_qrcode' && payload.paymentId) { 
+        url += `/payments/${payload.paymentId}/pixQrCode`; 
+    } else if (action === 'check_status' && payload.paymentId) { 
+        url += `/payments/${payload.paymentId}`; 
+    } else if (action === 'check_global' && payload.cpfCnpj) {
         const cpf = String(payload.cpfCnpj).replace(/\D/g, '');
-        path += `/payments?cpfCnpj=${cpf}`;
+        url += `/payments?cpfCnpj=${cpf}`;
     } else {
-        return res.status(200).json({ status: "ignorado" });
+        // Se cair aqui, o checkout não mandou a "action"
+        return res.status(200).json({ status: "ignorado", recebido: body });
     }
 
-    const options = {
-        hostname: 'api.asaas.com',
-        path: path,
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-            'access_token': key
-        }
-    };
-
-    // 3. Comunicação raiz via HTTPS (Não depende do fetch)
-    const request = https.request(options, (response) => {
-        let data = '';
-        response.on('data', (chunk) => { data += chunk; });
-        response.on('end', () => {
-            try {
-                // Tenta transformar a resposta em JSON
-                res.status(200).json(JSON.parse(data));
-            } catch (e) {
-                // Se o Asaas mandar HTML ou der erro, o site não trava
-                res.status(200).json({ error: "Erro de conversão", raw: data });
-            }
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'access_token': key
+            },
+            body: method === 'POST' ? JSON.stringify(payload) : null
         });
-    });
 
-    request.on('error', (err) => {
-        res.status(200).json({ error: "Erro de requisição", message: err.message });
-    });
-
-    if (method === 'POST') {
-        request.write(JSON.stringify(payload));
+        const data = await response.json();
+        return res.status(200).json(data);
+    } catch (err) {
+        return res.status(200).json({ error: "Erro de comunicação", msg: err.message });
     }
-    
-    request.end();
-}
+};
