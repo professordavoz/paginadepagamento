@@ -12,7 +12,6 @@ module.exports = async function handler(req, res) {
   if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada' });
 
   try {
-    // Parse manual do body — garante que funciona em qualquer caso
     let body = req.body;
     if (!body || typeof body === 'string') {
       body = await new Promise((resolve, reject) => {
@@ -27,6 +26,7 @@ module.exports = async function handler(req, res) {
     }
 
     const { action, payload } = body;
+    console.log('ACTION:', action, 'PAYLOAD:', JSON.stringify(payload));
 
     if (action === 'create_customer') {
       return res.json(await asaas('/customers', 'POST', payload, ASAAS_API_KEY));
@@ -44,6 +44,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Ação desconhecida: ' + action });
 
   } catch (err) {
+    console.error('ERRO:', err.message);
     return res.status(400).json({ error: err.message });
   }
 };
@@ -56,6 +57,7 @@ async function asaas(endpoint, method, body, key) {
   if (body) options.body = JSON.stringify(body);
   const r = await fetch(ASAAS_BASE + endpoint, options);
   const data = await r.json();
-  if (!r.ok) throw new Error(data.errors?.[0]?.description || data.error || 'Erro no Asaas');
+  console.log('ASAAS RESPONSE:', endpoint, r.status, JSON.stringify(data));
+  if (!r.ok) throw new Error(data.errors?.[0]?.description || data.error || JSON.stringify(data));
   return data;
 }
