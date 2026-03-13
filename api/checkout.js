@@ -6,8 +6,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
-
+  
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
   if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada na Vercel' });
 
@@ -27,6 +26,7 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json(result);
   } catch (err) {
+    // Retorna o erro real vindo do Asaas para o Frontend
     return res.status(400).json({ error: err.message });
   }
 };
@@ -34,7 +34,10 @@ module.exports = async function handler(req, res) {
 async function asaas(endpoint, method, body, key) {
   const options = {
     method,
-    headers: { 'Content-Type': 'application/json', 'access_token': key }
+    headers: { 
+      'Content-Type': 'application/json', 
+      'access_token': key.trim() // .trim() remove espaços acidentais
+    }
   };
   if (body && method !== 'GET') options.body = JSON.stringify(body);
   
@@ -45,9 +48,13 @@ async function asaas(endpoint, method, body, key) {
   try {
     data = text ? JSON.parse(text) : {};
   } catch (e) {
-    throw new Error("Resposta inválida da API: " + text.substring(0, 100));
+    throw new Error("Erro de comunicação com o banco.");
   }
 
-  if (!r.ok) throw new Error(data.errors?.[0]?.description || "Erro no Asaas");
+  if (!r.ok) {
+    // Pega a descrição do erro do Asaas (ex: "CPF inválido")
+    const msg = data.errors?.[0]?.description || "Erro na API do Asaas";
+    throw new Error(msg);
+  }
   return data;
 }
