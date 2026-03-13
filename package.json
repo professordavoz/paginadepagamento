@@ -1,9 +1,5 @@
 {
   "name": "pagina-de-pagamento-academia-da-voz",
   "version": "1.0.0",
-  "description": "Checkout Asaas",
-  "scripts": {
-    "start": "node api/checkout.js"
-  },
-  "dependencies": {}
+  "engines": { "node": "24.x" }
 }
