@@ -2,20 +2,20 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout PIX</title>
     <style>
         body { font-family: sans-serif; background: #000; color: #fff; display: flex; justify-content: center; padding: 20px; }
-        .box { background: #111; padding: 30px; border-radius: 15px; width: 100%; max-width: 400px; border: 1px solid #333; }
+        .card { background: #111; padding: 30px; border-radius: 15px; width: 100%; max-width: 400px; border: 1px solid #333; }
         input { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 8px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; background: #ff3b3b; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         #status { margin-top: 20px; text-align: center; }
-        .qr-box { background: #fff; color: #000; padding: 20px; border-radius: 10px; margin-top: 20px; }
+        .erro { background: rgba(255,0,0,0.1); border: 1px solid #ff3b3b; color: #ff3b3b; padding: 10px; border-radius: 8px; }
+        .qr-box { background: #fff; color: #000; padding: 20px; border-radius: 10px; }
         .qr-box img { width: 100%; }
     </style>
 </head>
 <body>
-    <div class="box">
+    <div class="card">
         <h2 style="text-align:center; color:#ff3b3b">Finalizar Compra</h2>
         <input type="text" id="nome" placeholder="Nome Completo">
         <input type="email" id="email" placeholder="E-mail">
@@ -23,41 +23,29 @@
         <button id="btn" onclick="gerar()">GERAR PIX - R$ 35,00</button>
         <div id="status"></div>
     </div>
-
     <script>
         async function gerar() {
             const status = document.getElementById('status');
-            const btn = document.getElementById('btn');
             status.innerHTML = "Processando...";
-            btn.disabled = true;
-
             const payload = {
                 name: document.getElementById('nome').value,
                 email: document.getElementById('email').value,
                 cpfCnpj: document.getElementById('cpf').value.replace(/\D/g, '')
             };
-
             try {
-                // Rota direta da Vercel: /api/checkout
                 const cli = await call('/api/checkout', { action: 'create_customer', payload });
-                const pag = await call('/api/checkout', { 
-                    action: 'create_payment', 
-                    payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
-                });
+                const pag = await call('/api/checkout', { action: 'create_payment', payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } });
                 const qr = await call('/api/checkout', { action: 'pix_qrcode', payload: { paymentId: pag.id } });
-
-                status.innerHTML = `<div class="qr-box"><h3>Escaneie o PIX</h3><img src="data:image/png;base64,${qr.encodedImage}"><p style="font-size:10px; word-break:break-all;">${qr.payload}</p></div>`;
+                status.innerHTML = `<div class="qr-box"><h3>Pague com PIX</h3><img src="data:image/png;base64,${qr.encodedImage}"><p style="font-size:10px;word-break:break-all;">${qr.payload}</p></div>`;
             } catch (err) {
-                status.innerHTML = `<b style="color:#ff3b3b">Erro: ${err.message}</b>`;
-                btn.disabled = false;
+                status.innerHTML = `<div class="erro">⚠️ ${err.message}</div>`;
             }
         }
-
         async function call(url, body) {
             const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            const data = await r.json();
-            if (!r.ok) throw new Error(data.errors?.[0]?.description || data.error || "Erro na API");
-            return data;
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || "Erro na API");
+            return d;
         }
     </script>
 </body>
