@@ -1,10 +1,6 @@
-// api/checkout.js — Vercel Serverless Function
-// A chave do Asaas fica segura aqui como variável de ambiente
-
 const ASAAS_BASE = 'https://api.asaas.com/api/v3';
 
-export default async function handler(req, res) {
-  // CORS — permite chamadas do seu domínio
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,56 +14,34 @@ export default async function handler(req, res) {
   try {
     const { action, payload } = req.body;
 
-    // ── 1. CRIAR CLIENTE ──────────────────────────────
     if (action === 'create_customer') {
-      const r = await asaas('/customers', 'POST', payload, ASAAS_API_KEY);
-      return res.json(r);
+      return res.json(await asaas('/customers', 'POST', payload, ASAAS_API_KEY));
     }
-
-    // ── 2. CRIAR COBRANÇA (PIX ou CARTÃO) ─────────────
     if (action === 'create_payment') {
-      const r = await asaas('/payments', 'POST', payload, ASAAS_API_KEY);
-      return res.json(r);
+      return res.json(await asaas('/payments', 'POST', payload, ASAAS_API_KEY));
     }
-
-    // ── 3. BUSCAR QR CODE PIX ─────────────────────────
     if (action === 'pix_qrcode') {
-      const { paymentId } = payload;
-      const r = await asaas(`/payments/${paymentId}/pixQrCode`, 'GET', null, ASAAS_API_KEY);
-      return res.json(r);
+      return res.json(await asaas(`/payments/${payload.paymentId}/pixQrCode`, 'GET', null, ASAAS_API_KEY));
     }
-
-    // ── 4. CHECAR STATUS DO PAGAMENTO ─────────────────
     if (action === 'payment_status') {
-      const { paymentId } = payload;
-      const r = await asaas(`/payments/${paymentId}`, 'GET', null, ASAAS_API_KEY);
+      const r = await asaas(`/payments/${payload.paymentId}`, 'GET', null, ASAAS_API_KEY);
       return res.json({ status: r.status });
     }
-
     return res.status(400).json({ error: 'Ação desconhecida' });
 
   } catch (err) {
-    console.error('Asaas error:', err.message);
     return res.status(400).json({ error: err.message });
   }
-}
+};
 
 async function asaas(endpoint, method, body, key) {
   const options = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      'access_token': key
-    }
+    headers: { 'Content-Type': 'application/json', 'access_token': key }
   };
   if (body) options.body = JSON.stringify(body);
-
-  const response = await fetch(ASAAS_BASE + endpoint, options);
-  const data = await response.json();
-
-  if (!response.ok) {
-    const msg = data.errors?.[0]?.description || data.error || 'Erro no Asaas';
-    throw new Error(msg);
-  }
+  const r = await fetch(ASAAS_BASE + endpoint, options);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.errors?.[0]?.description || data.error || 'Erro no Asaas');
   return data;
 }
