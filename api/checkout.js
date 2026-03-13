@@ -1,46 +1,27 @@
-const ASAAS_BASE = 'https://api.asaas.com/v3';
-
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
-
-    if (req.method === 'OPTIONS') return res.status(200).end();
-
-    const key = process.env.ASAAS_API_KEY;
-    const { action, payload } = req.body || {};
+    // O Asaas envia os dados via POST
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: "Método não permitido" });
+    }
 
     try {
-        let url = ASAAS_BASE;
-        let method = 'POST';
+        const body = req.body;
+        console.log("Evento do Asaas recebido:", body.event);
 
-        // Busca global por pagamentos usando CPF ou Email
-        if (action === 'check_global') {
-            url = `${ASAAS_BASE}/payments?limit=50`; 
-            if (payload.cpfCnpj) url += `&cpfCnpj=${payload.cpfCnpj}`;
-            else url += `&email=${payload.email}`;
-            method = 'GET';
-        }
-        else if (action === 'create_customer') url += '/customers';
-        else if (action === 'create_payment') url += '/payments';
-        else if (action === 'pix_qrcode') {
-            url += `/payments/${payload.paymentId}/pixQrCode`;
-            method = 'GET';
-        }
-        else if (action === 'check_status') {
-            url += `/payments/${payload.paymentId}`;
-            method = 'GET';
+        // Verificamos se o pagamento foi confirmado
+        if (body.event === 'PAYMENT_RECEIVED' || body.event === 'PAYMENT_CONFIRMED') {
+            const paymentId = body.payment.id;
+            const emailCliente = body.payment.email;
+
+            // Aqui você sabe que o cliente PAGOU.
+            console.log(`PAGAMENTO APROVADO: ${paymentId} - Cliente: ${emailCliente}`);
         }
 
-        const response = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json', 'access_token': key.trim() },
-            body: method === 'POST' ? JSON.stringify(payload) : null
-        });
+        // Resposta obrigatória (Status 200) para o Asaas não marcar como erro
+        return res.status(200).json({ received: true });
 
-        const data = await response.json();
-        return res.status(200).json(data);
     } catch (err) {
+        console.error("Erro no Webhook:", err.message);
         return res.status(500).json({ error: err.message });
     }
 }
