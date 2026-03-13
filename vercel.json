@@ -1,6 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/checkout", "destination": "/api/checkout.js" },
     { "source": "/checkout", "destination": "/public/checkout.html" },
     { "source": "/", "destination": "/public/checkout.html" }
   ]
