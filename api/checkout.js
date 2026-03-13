@@ -14,11 +14,9 @@ export default async function handler(req, res) {
         let url = ASAAS_BASE;
         let method = 'POST';
 
-        // BUSCA DIRETA POR PAGAMENTO JÁ REALIZADO (CPF OU EMAIL)
+        // Busca global por pagamentos usando CPF ou Email
         if (action === 'check_global') {
-            const identificador = payload.cpfCnpj || payload.email;
-            url = `${ASAAS_BASE}/payments?status=RECEIVED,CONFIRMED&limit=1`;
-            // Se tiver CPF, buscamos por ele, se não, por e-mail
+            url = `${ASAAS_BASE}/payments?limit=50`; 
             if (payload.cpfCnpj) url += `&cpfCnpj=${payload.cpfCnpj}`;
             else url += `&email=${payload.email}`;
             method = 'GET';
