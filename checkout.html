@@ -3,34 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout PIX</title>
+    <title>Checkout PIX - Academia da Voz</title>
     <style>
-        body { font-family: sans-serif; background: #000; color: #fff; display: flex; justify-content: center; padding: 20px; margin:0; }
+        body { font-family: sans-serif; background: #000; color: #fff; display: flex; justify-content: center; padding: 20px; margin: 0; }
         .card { background: #111; padding: 30px; border-radius: 15px; width: 100%; max-width: 400px; border: 1px solid #333; text-align: center; }
+        h2 { color: #ff3b3b; margin-top: 0; }
         input { width: 100%; padding: 12px; margin: 10px 0; background: #222; border: 1px solid #444; color: #fff; border-radius: 8px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; background: #ff3b3b; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         #status { margin-top: 20px; }
         .qr-box { background: #fff; color: #000; padding: 20px; border-radius: 12px; margin-top: 20px; }
         .qr-box img { width: 100%; max-width: 250px; display: block; margin: 0 auto; }
         .pix-copia { background: #eee; padding: 10px; font-size: 11px; word-break: break-all; margin-top: 10px; border-radius: 5px; border: 1px solid #ccc; font-family: monospace; }
-        .erro-alerta { color: #ff3b3b; padding: 10px; border: 1px solid #ff3b3b; border-radius: 8px; background: rgba(255,0,0,0.1); }
+        .sucesso { color: #00ff00; font-weight: bold; font-size: 18px; margin-top: 20px; }
     </style>
 </head>
 <body>
     <div class="card">
-        <h2 style="color:#ff3b3b">Finalizar Compra</h2>
-        <input type="text" id="nome" placeholder="Nome Completo">
-        <input type="email" id="email" placeholder="E-mail">
-        <input type="text" id="cpf" placeholder="CPF (apenas números)">
-        <button id="btn" onclick="gerarPix()">GERAR PIX - R$ 35,00</button>
+        <h2 id="titulo">Finalizar Compra</h2>
+        <div id="form-container">
+            <p>Total: R$ 35,00</p>
+            <input type="text" id="nome" placeholder="Nome Completo">
+            <input type="email" id="email" placeholder="E-mail">
+            <input type="text" id="cpf" placeholder="CPF (apenas números)">
+            <button id="btn" onclick="gerarPix()">GERAR PIX</button>
+        </div>
         <div id="status"></div>
     </div>
 
     <script>
+        let checkInterval;
+
         async function gerarPix() {
             const status = document.getElementById('status');
             const btn = document.getElementById('btn');
-            status.innerHTML = "Gerando pagamento...";
+            status.innerHTML = "Gerando seu QR Code...";
             btn.disabled = true;
 
             const dados = {
@@ -49,19 +55,54 @@
                 });
                 const qr = await callAPI('pix_qrcode', { paymentId: pag.id });
 
-                if (!qr.encodedImage) throw new Error("Imagem do QR Code não gerada pelo Asaas.");
+                document.getElementById('form-container').style.display = 'none';
+                document.getElementById('titulo').innerText = "Aguardando Pagamento";
 
                 status.innerHTML = `
                     <div class="qr-box">
-                        <h3 style="margin-top:0">Escaneie o QR Code</h3>
                         <img src="data:image/png;base64,${qr.encodedImage}">
                         <p style="font-weight:bold; margin-top:10px;">Copia e Cola:</p>
                         <div class="pix-copia">${qr.payload}</div>
+                        <p style="font-size:12px; color:#666; margin-top:15px;">Vigiando pagamento em tempo real...</p>
                     </div>`;
+
+                // Inicia a verificação automática a cada 5 segundos
+                iniciarVerificacao(pag.id);
+
             } catch (err) {
-                status.innerHTML = `<div class="erro-alerta">⚠️ ${err.message}</div>`;
+                status.innerHTML = `<div style="color:#ff3b3b">⚠️ ${err.message}</div>`;
                 btn.disabled = false;
             }
+        }
+
+        function iniciarVerificacao(paymentId) {
+            checkInterval = setInterval(async () => {
+                try {
+                    // Chamamos uma nova ação no backend para checar o status
+                    const check = await fetch('/api/checkout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'check_status', payload: { paymentId } })
+                    });
+                    const res = await check.json();
+
+                    if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
+                        clearInterval(checkInterval);
+                        document.getElementById('status').innerHTML = `
+                            <div class="sucesso">
+                                ✅ PAGAMENTO CONFIRMADO!<br>
+                                <p style="color:#fff; font-size:14px;">Redirecionando para o curso...</p>
+                            </div>`;
+                        
+                        // REDIRECIONAMENTO: Coloque o link do seu curso ou ebook aqui
+                        setTimeout(() => {
+                            window.location.href = "https://seulinkdeentrega.com.br";
+                        }, 3000);
+                    }
+                } catch (e) {
+                    console.log("Erro ao checar status");
+                }
+            }, 5000); // 5 segundos
         }
 
         async function callAPI(action, payload) {
@@ -70,9 +111,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, payload })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Erro na API");
-            return data;
+            return await res.json();
         }
     </script>
 </body>
