@@ -12,7 +12,21 @@ module.exports = async function handler(req, res) {
   if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada' });
 
   try {
-    const { action, payload } = req.body;
+    // Parse manual do body — garante que funciona em qualquer caso
+    let body = req.body;
+    if (!body || typeof body === 'string') {
+      body = await new Promise((resolve, reject) => {
+        let raw = '';
+        req.on('data', chunk => raw += chunk);
+        req.on('end', () => {
+          try { resolve(JSON.parse(raw)); }
+          catch (e) { reject(new Error('JSON inválido: ' + raw)); }
+        });
+        req.on('error', reject);
+      });
+    }
+
+    const { action, payload } = body;
 
     if (action === 'create_customer') {
       return res.json(await asaas('/customers', 'POST', payload, ASAAS_API_KEY));
@@ -27,7 +41,7 @@ module.exports = async function handler(req, res) {
       const r = await asaas(`/payments/${payload.paymentId}`, 'GET', null, ASAAS_API_KEY);
       return res.json({ status: r.status });
     }
-    return res.status(400).json({ error: 'Ação desconhecida' });
+    return res.status(400).json({ error: 'Ação desconhecida: ' + action });
 
   } catch (err) {
     return res.status(400).json({ error: err.message });
