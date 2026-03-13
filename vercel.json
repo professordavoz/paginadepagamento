@@ -1,6 +1,13 @@
 {
+  "version": 2,
   "rewrites": [
-    { "source": "/checkout", "destination": "/public/checkout.html" },
-    { "source": "/", "destination": "/public/checkout.html" }
+    {
+      "source": "/api/checkout",
+      "destination": "/api/checkout.js"
+    },
+    {
+      "source": "/",
+      "destination": "/checkout.html"
+    }
   ]
 }
