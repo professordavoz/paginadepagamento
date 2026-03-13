@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
-    // Configuração de CORS para o navegador não bloquear
+    // Libera o acesso para o navegador (CORS)
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
@@ -9,20 +9,22 @@ export default async function handler(req, res) {
     const key = process.env.ASAAS_API_KEY ? process.env.ASAAS_API_KEY.trim() : null;
 
     if (!key) {
-        return res.status(200).json({ error: "ERRO_CHAVE_FALTANDO" });
+        return res.status(500).json({ error: "ASAAS_API_KEY não configurada na Vercel" });
     }
 
     const { action, payload } = req.body || {};
+    let url = 'https://api.asaas.com/v3';
+    let method = 'GET';
 
     try {
-        let url = 'https://api.asaas.com/v3';
-        let method = 'GET';
-
         if (action === 'create_customer') { url += '/customers'; method = 'POST'; }
         else if (action === 'create_payment') { url += '/payments'; method = 'POST'; }
         else if (action === 'pix_qrcode') { url += `/payments/${payload.paymentId}/pixQrCode`; }
         else if (action === 'check_status') { url += `/payments/${payload.paymentId}`; }
-        else if (action === 'check_global') { url += `/payments?cpfCnpj=${payload.cpfCnpj}`; }
+        else if (action === 'check_global') { 
+            const cpf = payload.cpfCnpj.replace(/\D/g, '');
+            url += `/payments?cpfCnpj=${cpf}`; 
+        }
 
         const response = await fetch(url, {
             method,
@@ -37,7 +39,6 @@ export default async function handler(req, res) {
         return res.status(200).json(data);
 
     } catch (err) {
-        // Retorna um JSON mesmo em caso de erro para não dar o erro do seu print
-        return res.status(200).json({ error: "ERRO_INTERNO", message: err.message });
+        return res.status(500).json({ error: err.message });
     }
 }
