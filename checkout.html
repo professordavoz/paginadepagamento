@@ -9,11 +9,11 @@
         const cpfLimpo = document.getElementById('cpf').value.replace(/\D/g, '');
 
         if (!email || !cpfLimpo) {
-            status.innerHTML = `<b style="color:yellow">Preencha E-mail e CPF!</b>`;
+            status.innerHTML = `<b style="color:yellow">Preencha o E-mail e o CPF!</b>`;
             return;
         }
 
-        status.innerHTML = "Verificando seu pagamento...";
+        status.innerHTML = "A verificar o seu pagamento...";
         btn.disabled = true;
 
         try {
@@ -30,13 +30,13 @@
                 }
             }
 
-            status.innerHTML = "Identificando cadastro...";
+            status.innerHTML = "A identificar o registo...";
             const cli = await call('/api/checkout', { 
                 action: 'create_customer', 
                 payload: { name: nome, email: email, cpfCnpj: cpfLimpo } 
             });
             
-            status.innerHTML = "Gerando PIX...";
+            status.innerHTML = "A gerar o PIX...";
             const pag = await call('/api/checkout', { 
                 action: 'create_payment', 
                 payload: { 
@@ -44,7 +44,7 @@
                     billingType: 'PIX', 
                     value: 35.00, 
                     dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-                    externalReference: email // <--- AQUI ESTÁ A SOLUÇÃO! Envia o e-mail pro Supabase
+                    externalReference: email
                 } 
             });
 
@@ -55,9 +55,9 @@
                 <div style="background:#fff; color:#000; padding:20px; border-radius:12px; text-align:center;">
                     <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%; max-width:250px;">
                     <p style="background:#eee; padding:10px; font-size:10px; word-break:break-all;">${qr.payload}</p>
-                    <p style="color:blue; font-weight:bold;">Aguardando pagamento (R$ 35,00)...</p>
+                    <p style="color:blue; font-weight:bold;">A aguardar pagamento...</p>
                     <div id="radar-asaas" style="margin-top:15px; padding:10px; background:#222; color:#0f0; font-family:monospace; border-radius:5px; font-size:12px;">
-                        Iniciando radar...
+                        A monitorizar a confirmação...
                     </div>
                 </div>`;
 
@@ -71,34 +71,28 @@
 
     function iniciarVigia(paymentId) {
         if (vigia) clearInterval(vigia);
-        let tentativas = 0;
-        
         vigia = setInterval(async () => {
-            tentativas++;
             try {
                 const res = await call('/api/checkout', { action: 'check_status', payload: { paymentId } });
-                
                 const radar = document.getElementById('radar-asaas');
-                if(radar) {
-                    radar.innerHTML = `Tentativa: ${tentativas} | Status: ${res.status || 'Buscando...'}`;
-                }
+                if(radar) radar.innerHTML = `Estado no Asaas: ${res.status}`;
 
                 if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
                     clearInterval(vigia);
-                    if(radar) radar.innerHTML = "PAGAMENTO RECEBIDO! Liberando acesso...";
                     redirecionarSucesso();
                 }
             } catch (e) {
-                const radar = document.getElementById('radar-asaas');
-                if(radar) radar.innerHTML = "Erro na vigia: " + e.message;
+                console.error("Erro na vigia:", e);
             }
         }, 5000); 
     }
 
     function redirecionarSucesso() {
-        document.getElementById('status').innerHTML = `<h2 style="color:#00ff00">PAGAMENTO IDENTIFICADO!</h2><p>Redirecionando...</p>`;
+        document.getElementById('status').innerHTML = `<h2 style="color:#00ff00">PAGAMENTO IDENTIFICADO!</h2><p>A redirecionar para a Academia da Voz...</p>`;
+        
         setTimeout(() => {
-            window.location.href = "https://vocal-divine-flow.lovable.app/obrigado";
+            // Alterado para window.location.replace com a barra no final
+            window.location.replace("https://vocal-divine-flow.lovable.app/obrigado/");
         }, 2000);
     }
 
