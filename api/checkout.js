@@ -14,9 +14,7 @@ export default async function handler(req, res) {
         let url = ASAAS_BASE;
         let method = 'POST';
 
-        // NOVA FUNÇÃO: Verifica se o cliente já tem pagamentos confirmados
         if (action === 'check_existing') {
-            // Busca cobranças filtrando por e-mail e status recebido/confirmado
             url = `${ASAAS_BASE}/payments?customer=${payload.customerId}&status=RECEIVED,CONFIRMED`;
             method = 'GET';
         }
