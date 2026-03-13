@@ -1,27 +1,40 @@
+const ASAAS_BASE = 'https://api.asaas.com/v3';
+
 export default async function handler(req, res) {
-    if (req.method !== 'POST') return res.status(405).send('Método não permitido');
+    const key = process.env.ASAAS_API_KEY;
 
-    // O Token que você acabou de me passar para validar a segurança
-    const WEBHOOK_TOKEN = "whsec_I-EhHPPOmwR2BHdlJZmmTlOGoRC3d7RzYOKpelp7yFs";
-    const asaasToken = req.headers['asaas-access-token'];
-
-    // Validação de segurança básica
-    if (asaasToken !== WEBHOOK_TOKEN) {
-        console.log("Tentativa de acesso inválida ao Webhook");
-        // Por enquanto vamos deixar passar para testar, mas o ideal é retornar 401
+    if (!key) {
+        return res.status(500).json({ error: "Chave ASAAS_API_KEY não encontrada na Vercel" });
     }
 
-    try {
-        const body = req.body;
+    const { action, payload } = req.body;
 
-        // Se o status for de pagamento recebido
-        if (body.event === 'PAYMENT_RECEIVED' || body.event === 'PAYMENT_CONFIRMED') {
-            console.log(`Pagamento confirmado via Webhook: ${body.payment.id}`);
-            // Aqui o seu backend já sabe que o dinheiro caiu
+    try {
+        let url = ASAAS_BASE;
+        let method = 'POST';
+
+        if (action === 'create_customer') url += '/customers';
+        else if (action === 'create_payment') url += '/payments';
+        else if (action === 'pix_qrcode') {
+            url += `/payments/${payload.paymentId}/pixQrCode`;
+            method = 'GET';
+        }
+        else if (action === 'check_status') {
+            url += `/payments/${payload.paymentId}`;
+            method = 'GET';
         }
 
-        // Resposta obrigatória para o Asaas
-        return res.status(200).json({ received: true });
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'access_token': key.trim() // O .trim() remove espaços invisíveis que causam erro
+            },
+            body: method === 'POST' ? JSON.stringify(payload) : null
+        });
+
+        const data = await response.json();
+        return res.status(200).json(data);
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
