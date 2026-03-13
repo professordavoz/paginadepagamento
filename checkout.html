@@ -6,7 +6,6 @@
         const btn = document.getElementById('btn');
         const nome = document.getElementById('nome').value;
         const email = document.getElementById('email').value;
-        // Limpa CPF para garantir a busca no Asaas
         const cpfLimpo = document.getElementById('cpf').value.replace(/\D/g, '');
 
         if (!email || !cpfLimpo) {
@@ -18,23 +17,19 @@
         btn.disabled = true;
 
         try {
-            // 1. Busca no histórico do Asaas (Agora com a rota dupla que consertamos)
             const busca = await call('/api/checkout', { 
                 action: 'check_global', 
                 payload: { cpfCnpj: cpfLimpo } 
             });
 
-            // 2. Trava de segurança rígida: SÓ passa se o Asaas confirmar que o dinheiro caiu
             if (busca && busca.data && Array.isArray(busca.data)) {
                 const jaEstaPago = busca.data.some(p => p.status === 'RECEIVED' || p.status === 'CONFIRMED');
-                
                 if (jaEstaPago) {
                     redirecionarSucesso();
-                    return; // Aborta a geração de um novo PIX e manda direto pro curso
+                    return; 
                 }
             }
 
-            // 3. Se não achou pagamento PAGO, cria um novo (Por isso você viu o QR Code)
             status.innerHTML = "Identificando cadastro...";
             const cli = await call('/api/checkout', { 
                 action: 'create_customer', 
@@ -44,17 +39,21 @@
             status.innerHTML = "Gerando PIX...";
             const pag = await call('/api/checkout', { 
                 action: 'create_payment', 
-                payload: { customer: cli.id, billingType: 'PIX', value: 1.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
+                payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
             });
 
             const qr = await call('/api/checkout', { action: 'pix_qrcode', payload: { paymentId: pag.id } });
 
             document.getElementById('form-container').style.display = 'none';
+            // ADICIONADO: O Radar visual para acompanharmos o status ao vivo
             status.innerHTML = `
                 <div style="background:#fff; color:#000; padding:20px; border-radius:12px; text-align:center;">
                     <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%; max-width:250px;">
                     <p style="background:#eee; padding:10px; font-size:10px; word-break:break-all;">${qr.payload}</p>
                     <p style="color:blue; font-weight:bold;">Aguardando pagamento...</p>
+                    <div id="radar-asaas" style="margin-top:15px; padding:10px; background:#222; color:#0f0; font-family:monospace; border-radius:5px; font-size:12px;">
+                        Iniciando radar de confirmação...
+                    </div>
                 </div>`;
 
             iniciarVigia(pag.id);
@@ -67,21 +66,34 @@
 
     function iniciarVigia(paymentId) {
         if (vigia) clearInterval(vigia);
+        let tentativas = 0;
+        
         vigia = setInterval(async () => {
+            tentativas++;
             try {
                 const res = await call('/api/checkout', { action: 'check_status', payload: { paymentId } });
+                
+                // Atualiza o radar na tela para você não ficar no escuro
+                const radar = document.getElementById('radar-asaas');
+                if(radar) {
+                    radar.innerHTML = `Tentativa: ${tentativas} | Status no Asaas: ${res.status || 'Buscando...'}`;
+                }
+
                 if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
                     clearInterval(vigia);
+                    if(radar) radar.innerHTML = "STATUS RECEBIDO! Liberando acesso...";
                     redirecionarSucesso();
                 }
             } catch (e) {
-                console.error("Erro na vigia:", e);
+                const radar = document.getElementById('radar-asaas');
+                if(radar) radar.innerHTML = "Erro na vigia: " + e.message;
             }
-        }, 5000);
+        }, 5000); // Checa a cada 5 segundos
     }
 
     function redirecionarSucesso() {
         document.getElementById('status').innerHTML = `<h2 style="color:#00ff00">PAGAMENTO IDENTIFICADO!</h2><p>Redirecionando...</p>`;
+        // Joga o aluno para a página de obrigado
         setTimeout(() => {
             window.location.href = "https://vocal-divine-flow.lovable.app/obrigado";
         }, 2000);
