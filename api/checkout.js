@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
   const { action, payload } = req.body || {};
 
   if (!action) {
-    return res.status(400).json({ error: 'Body vazio ou inválido. Recebido: ' + JSON.stringify(req.body) });
+    return res.status(400).json({ error: 'Body vazio. Recebido: ' + JSON.stringify(req.body) });
   }
 
   try {
@@ -32,7 +32,6 @@ module.exports = async function handler(req, res) {
       return res.json({ status: r.status });
     }
     return res.status(400).json({ error: 'Ação desconhecida: ' + action });
-
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
