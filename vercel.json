@@ -1,31 +1,7 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/checkout.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/checkout",
-      "dest": "/api/checkout.js"
-    },
-    {
-      "src": "/checkout",
-      "dest": "/public/checkout.html"
-    },
-    {
-      "src": "/checkout.html",
-      "dest": "/public/checkout.html"
-    },
-    {
-      "src": "/",
-      "dest": "/public/checkout.html"
-    }
+  "rewrites": [
+    { "source": "/api/checkout", "destination": "/api/checkout.js" },
+    { "source": "/checkout", "destination": "/public/checkout.html" },
+    { "source": "/", "destination": "/public/checkout.html" }
   ]
 }
