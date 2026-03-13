@@ -11,10 +11,16 @@ module.exports = async function handler(req, res) {
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
   if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada' });
 
-  const { action, payload } = req.body || {};
+  // FORÇA BRUTA: Garante que a Vercel vai conseguir ler a mensagem da tela
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) {}
+  }
+
+  const { action, payload } = body || {};
 
   if (!action) {
-    return res.status(400).json({ error: 'Body vazio. Recebido: ' + JSON.stringify(req.body) });
+    return res.status(400).json({ error: 'Body vazio ou irreconhecível. Recebido: ' + JSON.stringify(body) });
   }
 
   try {
@@ -27,21 +33,17 @@ module.exports = async function handler(req, res) {
     if (action === 'pix_qrcode') {
       return res.json(await asaas(`/payments/${payload.paymentId}/pixQrCode`, 'GET', null, ASAAS_API_KEY));
     }
-    // check_status e payment_status — ambos funcionam
     if (action === 'check_status' || action === 'payment_status') {
       const r = await asaas(`/payments/${payload.paymentId}`, 'GET', null, ASAAS_API_KEY);
       return res.json({ status: r.status });
     }
-    // check_global — verifica se CPF já tem pagamento confirmado
     if (action === 'check_global') {
       const cpf = payload.cpfCnpj;
-      // Busca clientes com esse CPF
       const customers = await asaas(`/customers?cpfCnpj=${cpf}`, 'GET', null, ASAAS_API_KEY);
       if (!customers.data || customers.data.length === 0) {
         return res.json({ data: [] });
       }
       const customerId = customers.data[0].id;
-      // Busca pagamentos desse cliente
       const payments = await asaas(`/payments?customer=${customerId}&status=RECEIVED`, 'GET', null, ASAAS_API_KEY);
       return res.json(payments);
     }
