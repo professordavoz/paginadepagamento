@@ -1,54 +1,43 @@
-const https = require('https');
-
-export default function handler(req, res) {
-    // Libera o acesso para o navegador não bloquear nada
+export default async function handler(req, res) {
+    // Configuração de CORS para o navegador não bloquear
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
     const key = process.env.ASAAS_API_KEY ? process.env.ASAAS_API_KEY.trim() : null;
+
+    if (!key) {
+        return res.status(200).json({ error: "ERRO_CHAVE_FALTANDO" });
+    }
+
     const { action, payload } = req.body || {};
 
-    let path = '/v3';
-    let method = 'GET';
+    try {
+        let url = 'https://api.asaas.com/v3';
+        let method = 'GET';
 
-    // Define o caminho correto baseado na ação do site
-    if (action === 'create_customer') { path += '/customers'; method = 'POST'; }
-    else if (action === 'create_payment') { path += '/payments'; method = 'POST'; }
-    else if (action === 'pix_qrcode') { path += `/payments/${payload.paymentId}/pixQrCode`; }
-    else if (action === 'check_status') { path += `/payments/${payload.paymentId}`; }
-    else if (action === 'check_global') { path += `/payments?cpfCnpj=${payload.cpfCnpj}&status=RECEIVED,CONFIRMED`; }
+        if (action === 'create_customer') { url += '/customers'; method = 'POST'; }
+        else if (action === 'create_payment') { url += '/payments'; method = 'POST'; }
+        else if (action === 'pix_qrcode') { url += `/payments/${payload.paymentId}/pixQrCode`; }
+        else if (action === 'check_status') { url += `/payments/${payload.paymentId}`; }
+        else if (action === 'check_global') { url += `/payments?cpfCnpj=${payload.cpfCnpj}`; }
 
-    const options = {
-        hostname: 'api.asaas.com',
-        path: path,
-        method: method,
-        headers: {
-            'Content-Type': 'application/json',
-            'access_token': key
-        }
-    };
-
-    const request = https.request(options, (response) => {
-        let data = '';
-        response.on('data', (chunk) => { data += chunk; });
-        response.on('end', () => {
-            try {
-                res.status(200).json(JSON.parse(data));
-            } catch (e) {
-                res.status(200).json({ status: "ok", raw: data });
-            }
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'access_token': key
+            },
+            body: method === 'POST' ? JSON.stringify(payload) : null
         });
-    });
 
-    request.on('error', (err) => {
-        res.status(500).json({ error: err.message });
-    });
+        const data = await response.json();
+        return res.status(200).json(data);
 
-    if (method === 'POST' && payload) {
-        request.write(JSON.stringify(payload));
+    } catch (err) {
+        // Retorna um JSON mesmo em caso de erro para não dar o erro do seu print
+        return res.status(200).json({ error: "ERRO_INTERNO", message: err.message });
     }
-    request.end();
 }
