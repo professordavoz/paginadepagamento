@@ -5,13 +5,13 @@ export default async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    const key = process.env.ASAAS_API_KEY;
+    const ASAAS_KEY = process.env.ASAAS_API_KEY;
     const { action, payload } = req.body || {};
 
-    if (!key) return res.status(200).json({ error: "Chave não configurada na Vercel." });
+    if (!ASAAS_KEY) return res.status(200).json({ error: "Configuração: ASAAS_API_KEY ausente na Vercel." });
 
     try {
-        let url = 'https://api.asaas.com/api/v3';
+        let url = 'https://api.asaas.com/v3';
         let method = 'POST';
 
         if (action === 'create_customer') url += '/customers';
@@ -23,17 +23,23 @@ export default async function handler(req, res) {
 
         const response = await fetch(url, {
             method,
-            headers: {
-                'Content-Type': 'application/json',
-                'access_token': key.trim()
+            headers: { 
+                'Content-Type': 'application/json', 
+                'access_token': ASAAS_KEY.trim() 
             },
             body: method === 'POST' ? JSON.stringify(payload) : null
         });
 
         const data = await response.json();
+
+        if (!response.ok) {
+            const msg = data.errors ? data.errors[0].description : "Erro na API do Asaas";
+            return res.status(400).json({ error: msg });
+        }
+
         return res.status(200).json(data);
 
     } catch (err) {
-        return res.status(200).json({ error: err.message });
+        return res.status(500).json({ error: "Falha no servidor: " + err.message });
     }
 }
