@@ -44,7 +44,7 @@
             status.innerHTML = "Gerando PIX...";
             const pag = await call('/api/checkout', { 
                 action: 'create_payment', 
-                payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
+                payload: { customer: cli.id, billingType: 'PIX', value: 1.00, dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] } 
             });
 
             const qr = await call('/api/checkout', { action: 'pix_qrcode', payload: { paymentId: pag.id } });
