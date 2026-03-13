@@ -2,107 +2,77 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout PIX - Asaas</title>
+    <title>Checkout PIX</title>
     <style>
-        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { max-width: 400px; width: 100%; border: 1px solid #ccc; padding: 20px; border-radius: 8px; }
-        input, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ddd; }
-        button { background-color: #28a745; color: white; cursor: pointer; font-weight: bold; border: none; }
-        button:disabled { background-color: #ccc; }
-        #qrcode-container { margin-top: 20px; text-align: center; display: none; }
-        #qrcode-image { width: 200px; height: 200px; }
-        .error { color: red; font-size: 14px; }
+        body { font-family: sans-serif; display: flex; justify-content: center; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 380px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; background: #1a73e8; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        button:hover { background: #1557b0; }
+        #status { margin-top: 20px; text-align: center; color: #444; }
+        img { width: 100%; border: 1px solid #eee; margin-top: 15px; border-radius: 8px; }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <h2>Finalizar Pagamento</h2>
-    <p>Valor: R$ 50,00 (Exemplo)</p>
-    
-    <input type="text" id="nome" placeholder="Nome Completo">
-    <input type="text" id="cpf" placeholder="CPF ou CNPJ">
-    <input type="email" id="email" placeholder="E-mail">
-    
-    <button id="btn-gerar" onclick="gerarPix()">Gerar QR Code PIX</button>
-    
-    <div id="mensagem-erro" class="error"></div>
-
-    <div id="qrcode-container">
-        <h3>Escaneie o QR Code:</h3>
-        <img id="qrcode-image" src="" alt="QR Code PIX">
-        <p><strong>Copia e Cola:</strong></p>
-        <textarea id="pix-copia-cola" readonly style="width: 100%; height: 60px;"></textarea>
+    <div class="card">
+        <h3>Finalizar Pagamento</h3>
+        <input type="text" id="nome" placeholder="Nome Completo">
+        <input type="text" id="cpf" placeholder="CPF ou CNPJ">
+        <input type="email" id="email" placeholder="E-mail">
+        <button onclick="gerarPagamento()">GERAR PIX (R$ 50,00)</button>
+        <div id="status"></div>
     </div>
-</div>
 
-<script>
-    async function gerarPix() {
-        const btn = document.getElementById('btn-gerar');
-        const erroDiv = document.getElementById('mensagem-erro');
-        const qrContainer = document.getElementById('qrcode-container');
-        
-        // Limpar estados anteriores
-        erroDiv.innerText = "";
-        btn.disabled = true;
-        btn.innerText = "Processando...";
+    <script>
+        async function gerarPagamento() {
+            const status = document.getElementById('status');
+            status.innerHTML = "Aguarde, processando...";
 
-        const payloadCliente = {
-            name: document.getElementById('nome').value,
-            cpfCnpj: document.getElementById('cpf').value,
-            email: document.getElementById('email').value
-        };
-
-        try {
-            // 1. CRIAR CLIENTE
-            const resCliente = await enviarParaAPI('create_customer', payloadCliente);
-            if (resCliente.error) throw new Error("Erro Cliente: " + resCliente.error);
-
-            // 2. CRIAR PAGAMENTO
-            const payloadPagamento = {
-                customer: resCliente.id,
-                billingType: 'PIX',
-                value: 50.00, // Ajuste conforme necessário
-                dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0] // Vence amanhã
+            const dadosCliente = {
+                name: document.getElementById('nome').value,
+                cpfCnpj: document.getElementById('cpf').value,
+                email: document.getElementById('email').value
             };
 
-            const resPagamento = await enviarParaAPI('create_payment', payloadPagamento);
-            if (resPagamento.error) throw new Error("Erro Pagamento: " + resPagamento.error);
+            try {
+                // 1. Criar Cliente
+                status.innerHTML = "Passo 1/3: Cadastrando cliente...";
+                const cliente = await chamarAPI('create_customer', dadosCliente);
+                if (cliente.error) throw new Error(cliente.error);
 
-            // 3. GERAR QR CODE
-            const resQrCode = await enviarParaAPI('pix_qrcode', { paymentId: resPagamento.id });
-            if (resQrCode.error) throw new Error("Erro QR Code: " + resQrCode.error);
+                // 2. Criar Pagamento
+                status.innerHTML = "Passo 2/3: Gerando cobrança...";
+                const pagamento = await chamarAPI('create_payment', {
+                    customer: cliente.id,
+                    billingType: 'PIX',
+                    value: 50.00,
+                    dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]
+                });
+                if (pagamento.error) throw new Error(pagamento.error);
 
-            // Mostrar resultado na tela
-            document.getElementById('qrcode-image').src = `data:image/png;base64,${resQrCode.encodedImage}`;
-            document.getElementById('pix-copia-cola').value = resQrCode.payload;
-            qrContainer.style.display = 'block';
-            btn.innerText = "PIX Gerado com Sucesso!";
+                // 3. Gerar QR Code
+                status.innerHTML = "Passo 3/3: Gerando QR Code...";
+                const qrcode = await chamarAPI('pix_qrcode', { paymentId: pagamento.id });
+                if (qrcode.error) throw new Error(qrcode.error);
 
-        } catch (err) {
-            console.error(err);
-            erroDiv.innerText = err.message;
-            btn.disabled = false;
-            btn.innerText = "Tentar Novamente";
+                status.innerHTML = `<h4>Sucesso! Escaneie abaixo:</h4>
+                    <img src="data:image/png;base64,${qrcode.encodedImage}">
+                    <p style="font-size:12px; word-break:break-all; background:#eee; padding:10px; margin-top:10px;">${qrcode.payload}</p>`;
+
+            } catch (err) {
+                status.innerHTML = `<b style="color:red">Erro: ${err.message}</b>`;
+            }
         }
-    }
 
-    // Função que centraliza a chamada para a sua API na Vercel
-    async function enviarParaAPI(action, payload) {
-        const URL_API = '/api/checkout'; // O caminho relativo funciona se estiver no mesmo domínio
-
-        const response = await fetch(URL_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, payload })
-        });
-
-        // Aqui evitamos o erro "Unexpected end of JSON" verificando se há conteúdo
-        const text = await response.text();
-        return text ? JSON.parse(text) : { error: "Resposta vazia do servidor" };
-    }
-</script>
-
+        async function chamarAPI(action, payload) {
+            const r = await fetch('/api/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, payload })
+            });
+            const text = await r.text();
+            return text ? JSON.parse(text) : { error: "Sem resposta do servidor" };
+        }
+    </script>
 </body>
 </html>
