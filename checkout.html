@@ -6,7 +6,7 @@
         const btn = document.getElementById('btn');
         const nome = document.getElementById('nome').value;
         const email = document.getElementById('email').value;
-        // Limpa CPF para garantir que a busca no Asaas funcione
+        // Limpa CPF para garantir que a busca no Asaas funcione perfeitamente
         const cpfLimpo = document.getElementById('cpf').value.replace(/\D/g, '');
 
         if (!email || !cpfLimpo) {
@@ -21,18 +21,22 @@
             // 1. CONFERÊNCIA REAL: Busca no histórico do Asaas
             const busca = await call('/api/checkout', { 
                 action: 'check_global', 
-                payload: { cpfCnpj: cpfLimpo, email: email } 
+                payload: { cpfCnpj: cpfLimpo } 
             });
 
-            // Verifica se existe algum pagamento com status de PAGO
-            const jaEstaPago = busca.data && busca.data.some(p => p.status === 'RECEIVED' || p.status === 'CONFIRMED');
+            console.log("Status da busca no Asaas:", busca); // Salva o registro no console
 
-            if (jaEstaPago) {
-                redirecionarSucesso();
-                return;
+            // 2. Trava Rígida: Verifica se existe o array 'data' e se há pagamento aprovado
+            if (busca && busca.data && Array.isArray(busca.data)) {
+                const jaEstaPago = busca.data.some(p => p.status === 'RECEIVED' || p.status === 'CONFIRMED');
+                
+                if (jaEstaPago) {
+                    redirecionarSucesso();
+                    return; // Aborta o código AQUI. Não deixa gerar o QR Code novo.
+                }
             }
 
-            // 2. Só cria se não houver pagamento confirmado
+            // 3. Só cria se passou pela trava e não tem pagamento confirmado
             status.innerHTML = "Identificando cadastro...";
             const cli = await call('/api/checkout', { 
                 action: 'create_customer', 
@@ -66,23 +70,11 @@
     function iniciarVigia(paymentId) {
         if (vigia) clearInterval(vigia);
         vigia = setInterval(async () => {
-            const res = await call('/api/checkout', { action: 'check_status', payload: { paymentId } });
-            if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
-                clearInterval(vigia);
-                redirecionarSucesso();
-            }
-        }, 5000);
-    }
-
-    function redirecionarSucesso() {
-        document.getElementById('status').innerHTML = `<h2 style="color:#00ff00">PAGAMENTO IDENTIFICADO!</h2><p>Redirecionando...</p>`;
-        setTimeout(() => {
-            window.location.href = "https://vocal-divine-flow.lovable.app/obrigado";
-        }, 2000);
-    }
-
-    async function call(url, body) {
-        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        return await r.json();
-    }
-</script>
+            try {
+                const res = await call('/api/checkout', { action: 'check_status', payload: { paymentId } });
+                if (res.status === 'RECEIVED' || res.status === 'CONFIRMED') {
+                    clearInterval(vigia);
+                    redirecionarSucesso();
+                }
+            } catch (e) {
+                console.error("Erro na vigia
