@@ -1,6 +1,7 @@
 const ASAAS_BASE = 'https://api.asaas.com/api/v3';
 
 export default async function handler(req, res) {
+  // Configuração de Headers para evitar bloqueios de CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, access_token');
@@ -8,20 +9,23 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const key = process.env.ASAAS_API_KEY;
-  if (!key) return res.status(500).json({ error: "ERRO: Chave ASAAS_API_KEY não configurada na Vercel." });
+  if (!key) return res.status(500).json({ error: "ERRO: ASAAS_API_KEY não configurada na Vercel." });
 
   try {
     const { action, payload } = req.body || {};
     let endpoint = '';
     let method = 'POST';
 
-    if (action === 'create_customer') endpoint = '/customers';
-    else if (action === 'create_payment') endpoint = '/payments';
-    else if (action === 'pix_qrcode') {
-      endpoint = `/payments/${payload?.paymentId}/pixQrCode`;
+    if (action === 'create_customer') {
+      endpoint = '/customers';
+    } else if (action === 'create_payment') {
+      endpoint = '/payments';
+    } else if (action === 'pix_qrcode') {
+      if (!payload?.paymentId) return res.status(400).json({ error: 'paymentId ausente.' });
+      endpoint = `/payments/${payload.paymentId}/pixQrCode`;
       method = 'GET';
     } else {
-      return res.status(400).json({ error: 'Ação inválida: ' + action });
+      return res.status(400).json({ error: 'Ação inválida ou não informada.' });
     }
 
     const response = await fetch(ASAAS_BASE + endpoint, {
@@ -44,6 +48,6 @@ export default async function handler(req, res) {
     return res.status(200).json(data);
 
   } catch (err) {
-    return res.status(500).json({ error: "Erro interno: " + err.message });
+    return res.status(500).json({ error: "Erro interno no servidor: " + err.message });
   }
 }
