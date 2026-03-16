@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout Seguro — Avaliação Vocal - Professor Kadu</title>
+    <title>Checkout — Avaliação Vocal</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -31,7 +31,7 @@
         .checkout-container {
             background: var(--card-bg);
             width: 100%;
-            max-width: 420px;
+            max-width: 440px;
             border-radius: 20px;
             overflow: hidden;
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
@@ -45,8 +45,11 @@
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
-        .header h1 { font-size: 24px; letter-spacing: -0.5px; }
-        .header p { color: var(--text-dim); font-size: 14px; margin-top: 5px; }
+        .header h1 { 
+            font-size: 20px; 
+            line-height: 1.4;
+            letter-spacing: -0.5px; 
+        }
 
         .price-section {
             padding: 20px;
@@ -68,7 +71,7 @@
         
         label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text-dim);
@@ -108,7 +111,6 @@
         }
 
         .btn-pay:hover { background: var(--primary-hover); transform: translateY(-2px); }
-        .btn-pay:active { transform: translateY(0); }
         .btn-pay:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         #status-msg {
@@ -118,33 +120,6 @@
             min-height: 24px;
         }
 
-        .security-footer {
-            padding: 20px;
-            text-align: center;
-            font-size: 11px;
-            color: #555;
-            border-top: 1px solid rgba(255,255,255,0.05);
-        }
-
-        /* Estilo do QR Code */
-        .pix-container {
-            background: #fff;
-            padding: 20px;
-            border-radius: 15px;
-            margin-top: 10px;
-        }
-        .pix-code {
-            background: #f4f4f4;
-            color: #333;
-            padding: 10px;
-            font-family: monospace;
-            font-size: 10px;
-            word-break: break-all;
-            margin-top: 10px;
-            border-radius: 5px;
-        }
-
-        /* Aviso de Suporte */
         .support-card {
             background: rgba(255, 204, 0, 0.1);
             border: 1px solid #ffcc00;
@@ -152,6 +127,22 @@
             border-radius: 12px;
             color: #ffcc00;
             text-align: center;
+            line-height: 1.5;
+        }
+
+        .pix-container {
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 10px;
+        }
+
+        .security-footer {
+            padding: 20px;
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            border-top: 1px solid rgba(255,255,255,0.05);
         }
     </style>
 </head>
@@ -159,8 +150,7 @@
 
 <div class="checkout-container">
     <div class="header">
-        <h1>Academia da Voz</h1>
-        <p>Acelere sua evolução vocal hoje</p>
+        <h1>Adquira sua avaliação vocal com o professor Kadu Vieira</h1>
     </div>
 
     <div class="price-section">
@@ -172,15 +162,15 @@
         <div id="dynamic-content">
             <div class="input-group">
                 <label>Nome Completo</label>
-                <input type="text" id="nome" placeholder="Ex: Carlos Eduardo">
+                <input type="text" id="nome" placeholder="Seu nome">
             </div>
             <div class="input-group">
-                <label>E-mail de Acesso</label>
+                <label>E-mail</label>
                 <input type="email" id="email" placeholder="seu@email.com">
             </div>
             <div class="input-group">
                 <label>Seu CPF</label>
-                <input type="text" id="cpf" placeholder="000.000.000-00" maxlength="11">
+                <input type="text" id="cpf" placeholder="00000000000" maxlength="11">
             </div>
             <button class="btn-pay" id="main-btn" onclick="iniciarFluxo()">GERAR PIX AGORA</button>
         </div>
@@ -188,18 +178,20 @@
     </div>
 
     <div class="security-footer">
-        🔒 Ambiente Criptografado e Seguro • Pagamentos via Asaas
+        🔒 Ambiente Seguro • Pagamento processado via Asaas
     </div>
 </div>
 
 <script>
-    // Configuração de Redirecionamento Local
+    console.log("Script de Checkout Ativo.");
+
     const PAGINA_OBRIGADO = "/obrigado.html";
 
     async function iniciarFluxo() {
         const status = document.getElementById('status-msg');
         const content = document.getElementById('dynamic-content');
         const btn = document.getElementById('main-btn');
+        
         const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
         const email = document.getElementById('email').value.trim();
         const nome = document.getElementById('nome').value.trim();
@@ -210,26 +202,26 @@
         }
 
         btn.disabled = true;
-        status.innerHTML = "Verificando histórico...";
+        status.innerHTML = "Verificando dados...";
 
         try {
-            // 1. VERIFICA SE JÁ PAGOU
+            // 1. VERIFICAÇÃO DE PAGAMENTO EXISTENTE
             const check = await callApi({ action: 'check_global', payload: { cpfCnpj: cpf } });
-            if (JSON.stringify(check).includes('RECEIVED')) {
+            if (JSON.stringify(check).includes('RECEIVED') || JSON.stringify(check).includes('CONFIRMED')) {
                 content.innerHTML = `
                     <div class="support-card">
                         <strong style="font-size:16px">Pagamento Identificado!</strong><br><br>
-                        Você já possui acesso ao curso.<br><br>
-                        Precisa de ajuda?<br>
-                        <strong>11 94319-0310</strong>
+                        Você já possui uma avaliação adquirida.<br><br>
+                        Entre em contato pelo WhatsApp:<br>
+                        <strong style="font-size:18px">11 94319-0310</strong>
                     </div>`;
                 status.innerHTML = "";
                 return;
             }
 
-            // 2. CRIA CLIENTE E COBRANÇA
-            status.innerHTML = "Preparando seu acesso...";
-            const cli = await callApi({ action: 'create_customer', payload: { name: nome || email, email, cpfCnpj: cpf } });
+            // 2. CRIAÇÃO DE COBRANÇA
+            status.innerHTML = "Gerando seu PIX...";
+            const cli = await callApi({ action: 'create_customer', payload: { name: nome || email, email: email, cpfCnpj: cpf } });
             const pag = await callApi({ action: 'create_payment', payload: { 
                 customer: cli.id, 
                 billingType: 'PIX', 
@@ -239,24 +231,27 @@
             } });
             const qr = await callApi({ action: 'pix_qrcode', payload: { paymentId: pag.id } });
 
-            // 3. EXIBE QR CODE
+            // 3. EXIBIÇÃO DO QR CODE
             content.innerHTML = `
                 <div style="text-align:center">
-                    <p style="margin-bottom:15px; font-weight:600">Escaneie o código abaixo:</p>
+                    <p style="margin-bottom:15px; font-weight:600; font-size:14px;">Escaneie o QR Code abaixo:</p>
                     <div class="pix-container">
-                        <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%; max-width:220px;">
-                        <div class="pix-code" id="pix-payload">${qr.payload}</div>
+                        <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%; max-width:200px;">
                     </div>
-                    <button class="btn-pay" style="margin-top:15px; font-size:13px" onclick="copiarPix()">COPIAR CÓDIGO PIX</button>
+                    <div style="background:#0a0a1a; padding:10px; border-radius:8px; margin-top:15px; font-size:10px; word-break:break-all; border:1px solid #333;" id="pix-copy-text">${qr.payload}</div>
+                    <button class="btn-pay" style="margin-top:10px; font-size:13px; padding:12px;" onclick="copiarPix()">COPIAR CÓDIGO PIX</button>
                 </div>`;
-            status.innerHTML = "<span style='color:var(--primary)'>Aguardando confirmação do banco...</span>";
+            status.innerHTML = "<span style='color:var(--primary)'>Aguardando confirmação...</span>";
 
-            // 4. VIGIA O STATUS
-            setInterval(async () => {
-                const s = await callApi({ action: 'check_status', payload: { paymentId: pag.id } });
-                if (s.status === 'RECEIVED' || s.status === 'CONFIRMED') {
-                    window.location.href = PAGINA_OBRIGADO;
-                }
+            // 4. MONITORAMENTO
+            const monitor = setInterval(async () => {
+                try {
+                    const s = await callApi({ action: 'check_status', payload: { paymentId: pag.id } });
+                    if (s.status === 'RECEIVED' || s.status === 'CONFIRMED') {
+                        clearInterval(monitor);
+                        window.location.href = PAGINA_OBRIGADO;
+                    }
+                } catch (e) { console.error("Erro no monitoramento", e); }
             }, 5000);
 
         } catch (e) {
@@ -267,3 +262,23 @@
 
     async function callApi(body) {
         const r = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!r.ok) {
+            const errTxt = await r.text();
+            throw new Error(errTxt || "Falha na conexão");
+        }
+        return await r.json();
+    }
+
+    function copiarPix() {
+        const payload = document.getElementById('pix-copy-text').innerText;
+        navigator.clipboard.writeText(payload);
+        alert("Código PIX copiado!");
+    }
+</script>
+
+</body>
+</html>
