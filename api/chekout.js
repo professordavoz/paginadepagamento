@@ -1,3 +1,5 @@
+const fetch = require('node-fetch'); // Adicionado para o motor funcionar
+
 const ASAAS_BASE = (process.env.ASAAS_ENV === 'production') 
   ? 'https://api.asaas.com/v3' 
   : 'https://sandbox.asaas.com/api/v3';
@@ -12,17 +14,14 @@ module.exports = async function handler(req, res) {
   const key = process.env.ASAAS_API_KEY;
   if (!key) return res.status(500).json({ error: 'Falta ASAAS_API_KEY na Vercel' });
 
-  // Força a interpretação do corpo da requisição
   let data = req.body;
   if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) {} }
   const { action, payload } = data || {};
 
   try {
-    // Validação de segurança para evitar o erro de campo vazio no Asaas
-    if (!payload && action !== 'check_status') throw new Error("Dados não recebidos pelo servidor");
+    if (!payload && action !== 'check_status') throw new Error("Dados não recebidos");
 
     if (action === 'create_customer') {
-      // BUSCA ANTES DE CRIAR: Impede o erro de CPF já cadastrado
       const b = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, key);
       if (b.data && b.data.length > 0) return res.json(b.data[0]);
       return res.json(await asaas('/customers', 'POST', payload, key));
@@ -53,6 +52,6 @@ async function asaas(endpoint, method, body, key) {
   if (body) opt.body = JSON.stringify(body);
   const r = await fetch(ASAAS_BASE + endpoint, opt);
   const res = await r.json();
-  if (!r.ok) throw new Error(res.errors?.[0]?.description || 'Erro técnico no Asaas');
+  if (!r.ok) throw new Error(res.errors?.[0]?.description || 'Erro no Asaas');
   return res;
 }
