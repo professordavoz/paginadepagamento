@@ -1,19 +1,20 @@
 module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).send('Apenas POST');
+    if (req.method !== 'POST') return res.status(405).send('Método não permitido');
 
-  const WEBHOOK_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN;
-  const tokenRecebido = req.headers['asaas-access-token'];
+    const ASAAS_TOKEN = process.env.ASAAS_WEBHOOK_TOKEN;
+    const authHeader = req.headers['asaas-access-token'];
 
-  if (tokenRecebido !== WEBHOOK_TOKEN) return res.status(401).json({ error: 'Token invalido' });
+    if (ASAAS_TOKEN && authHeader !== ASAAS_TOKEN) {
+        return res.status(401).json({ error: 'Token inválido' });
+    }
 
-  const body = req.body;
-  console.log(`Evento: ${body.event} - Pagamento: ${body.payment?.id}`);
+    const { event, payment } = req.body;
+    console.log(`Webhook recebido: ${event} para o pagamento ${payment?.id}`);
 
-  // Se o pagamento foi confirmado, o sistema registra aqui
-  if (body.event === 'PAYMENT_RECEIVED' || body.event === 'PAYMENT_CONFIRMED') {
-     // Aqui você pode adicionar a chamada para liberar no Supabase se desejar
-     console.log("PAGAMENTO APROVADO NO WEBHOOK");
-  }
+    // Resposta imediata para o Asaas
+    res.status(200).json({ received: true });
 
-  return res.status(200).json({ status: 'ok' });
+    if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
+        // Lógica de liberação de curso ou registro em banco de dados aqui
+    }
 };
