@@ -1,6 +1,6 @@
-const ASAAS_ENV = process.env.ASAAS_ENV || 'sandbox';
-const ASAAS_BASE = ASAAS_ENV === 'production'
-  ? 'https://api.asaas.com/v3'
+const ASAAS_ENV = process.env.ASAAS_ENV || 'production';
+const ASAAS_BASE = ASAAS_ENV === 'production' 
+  ? 'https://api.asaas.com/v3' 
   : 'https://sandbox.asaas.com/api/v3';
 
 module.exports = async function handler(req, res) {
@@ -9,26 +9,21 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
-  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada' });
+  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Falta ASAAS_API_KEY na Vercel' });
 
   let body = req.body;
-  if (typeof body === 'string') { try { body = JSON.parse(body); } catch (e) {} }
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) {} }
   const { action, payload } = body || {};
 
   try {
-    // CORREÇÃO VITAL: Se o cliente já existir, nós apenas retornamos o ID dele
     if (action === 'create_customer') {
-      try {
-        const result = await asaas('/customers', 'POST', payload, ASAAS_API_KEY);
-        return res.json(result);
-      } catch (err) {
-        if (err.message.includes('CPF') || err.message.includes('already exists')) {
-          const exist = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, ASAAS_API_KEY);
-          return res.json(exist.data[0]);
-        }
-        throw err;
-      }
+      // PROCURA O CLIENTE ANTES DE CRIAR (Evita erro de CPF duplicado)
+      const busca = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, ASAAS_API_KEY);
+      if (busca.data && busca.data.length > 0) return res.json(busca.data[0]);
+      
+      return res.json(await asaas('/customers', 'POST', payload, ASAAS_API_KEY));
     }
 
     if (action === 'create_payment') {
@@ -63,6 +58,6 @@ async function asaas(endpoint, method, body, key) {
   if (body) options.body = JSON.stringify(body);
   const r = await fetch(ASAAS_BASE + endpoint, options);
   const data = await r.json();
-  if (!r.ok) throw new Error(data.errors?.[0]?.description || JSON.stringify(data));
+  if (!r.ok) throw new Error(data.errors?.[0]?.description || 'Erro na API');
   return data;
 }
