@@ -1,5 +1,8 @@
 {
-  "name": "academia-da-voz-checkout",
+  "name": "academia-da-voz",
   "version": "1.0.0",
-  "dependencies": {}
+  "main": "index.js",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
 }
