@@ -1,6 +1,9 @@
 {
-  "name": "destrave-vocal-checkout",
+  "name": "pagina-de-pagamento-academia-da-voz",
   "version": "1.0.0",
-  "description": "Checkout Asaas — Kadu Vieira",
-  "engines": { "node": "18.x" }
+  "description": "Checkout Asaas + PIX",
+  "engines": {
+    "node": "24.x"
+  },
+  "dependencies": {}
 }
