@@ -5,7 +5,6 @@ const ASAAS_BASE = (process.env.ASAAS_ENV === 'production')
   : 'https://sandbox.asaas.com/api/v3';
 
 module.exports = async function handler(req, res) {
-    // Configuração Robusta de CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -16,11 +15,8 @@ module.exports = async function handler(req, res) {
     const key = process.env.ASAAS_API_KEY;
     if (!key) return res.status(500).json({ error: 'ASAAS_API_KEY ausente na Vercel' });
 
-    // Parsing garantido do body
     let body = req.body;
-    if (typeof body === 'string') {
-        try { body = JSON.parse(body); } catch (e) { return res.status(400).json({ error: 'JSON inválido' }); }
-    }
+    if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) {} }
     const { action, payload } = body || {};
 
     try {
@@ -38,29 +34,23 @@ module.exports = async function handler(req, res) {
             return res.json(await asaas('/customers', 'POST', payload, key));
         }
 
-        if (action === 'create_payment') {
-            return res.json(await asaas('/payments', 'POST', payload, key));
+        if (action === 'create_payment') return res.json(await asaas('/payments', 'POST', payload, key));
+        if (action === 'pix_qrcode') return res.json(await asaas(`/payments/${payload.paymentId}/pixQrCode`, 'GET', null, key));
+        
+        if (action === 'check_status') {
+            const r = await asaas(`/payments/${payload.paymentId}`, 'GET', null, key);
+            return res.json({ status: r.status });
         }
-
-        if (action === 'pix_qrcode') {
-            return res.json(await asaas(`/payments/${payload.paymentId}/pixQrCode`, 'GET', null, key));
-        }
-
-        return res.status(400).json({ error: 'Ação não reconhecida' });
     } catch (err) {
-        console.error('Erro Checkout:', err.message);
         return res.status(400).json({ error: err.message });
     }
 };
 
 async function asaas(endpoint, method, body, key) {
-    const opt = { 
-        method, 
-        headers: { 'Content-Type': 'application/json', 'access_token': key } 
-    };
+    const opt = { method, headers: { 'Content-Type': 'application/json', 'access_token': key } };
     if (body) opt.body = JSON.stringify(body);
     const r = await fetch(ASAAS_BASE + endpoint, opt);
     const res = await r.json();
-    if (!r.ok) throw new Error(res.errors?.[0]?.description || 'Erro na API Asaas');
+    if (!r.ok) throw new Error(res.errors?.[0]?.description || 'Erro Asaas');
     return res;
 }
