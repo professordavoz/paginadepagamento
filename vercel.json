@@ -1,7 +1,11 @@
 {
   "version": 2,
+  "functions": {
+    "api/*.js": {
+      "runtime": "vercel-node@latest"
+    }
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/obrigado", "destination": "/public/obrigado.html" }
+    { "source": "/api/(.*)", "destination": "/api/$1" }
   ]
 }
