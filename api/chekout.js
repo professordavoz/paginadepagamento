@@ -9,64 +9,50 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
-  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Falta ASAAS_API_KEY' });
+  const key = process.env.ASAAS_API_KEY;
+  if (!key) return res.status(500).json({ error: 'Falta ASAAS_API_KEY na Vercel' });
 
-  // CORREÇÃO CRÍTICA: Força a leitura do corpo da mensagem
-  let body = req.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch (e) { console.error("Erro ao converter JSON"); }
-  }
-
-  const { action, payload } = body || {};
-
-  // Se o payload não existir, o sistema para aqui com um erro claro
-  if (!payload || (!payload.cpfCnpj && action !== 'check_status')) {
-    return res.status(400).json({ error: 'Dados incompletos (CPF ausente no servidor)' });
-  }
+  // Força a interpretação do corpo da requisição
+  let data = req.body;
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch(e) {} }
+  const { action, payload } = data || {};
 
   try {
+    // Validação de segurança para evitar o erro de campo vazio no Asaas
+    if (!payload && action !== 'check_status') throw new Error("Dados não recebidos pelo servidor");
+
     if (action === 'create_customer') {
-      const busca = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, ASAAS_API_KEY);
-      if (busca.data && busca.data.length > 0) return res.json(busca.data[0]);
-      return res.json(await asaas('/customers', 'POST', payload, ASAAS_API_KEY));
+      // BUSCA ANTES DE CRIAR: Impede o erro de CPF já cadastrado
+      const b = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, key);
+      if (b.data && b.data.length > 0) return res.json(b.data[0]);
+      return res.json(await asaas('/customers', 'POST', payload, key));
     }
 
-    if (action === 'create_payment') {
-      return res.json(await asaas('/payments', 'POST', payload, ASAAS_API_KEY));
-    }
-
-    if (action === 'pix_qrcode') {
-      return res.json(await asaas(`/payments/${payload.paymentId}/pixQrCode`, 'GET', null, ASAAS_API_KEY));
-    }
-
+    if (action === 'create_payment') return res.json(await asaas('/payments', 'POST', payload, key));
+    if (action === 'pix_qrcode') return res.json(await asaas(`/payments/${payload.paymentId}/pixQrCode`, 'GET', null, key));
+    
     if (action === 'check_status') {
-      const r = await asaas(`/payments/${payload.paymentId}`, 'GET', null, ASAAS_API_KEY);
+      const r = await asaas(`/payments/${payload.paymentId}`, 'GET', null, key);
       return res.json({ status: r.status });
     }
 
     if (action === 'check_global') {
       const cpf = payload.cpfCnpj.replace(/\D/g, '');
-      const customers = await asaas(`/customers?cpfCnpj=${cpf}`, 'GET', null, ASAAS_API_KEY);
-      if (!customers.data || customers.data.length === 0) return res.json({ data: [] });
-      const payments = await asaas(`/payments?customer=${customers.data[0].id}&status=RECEIVED`, 'GET', null, ASAAS_API_KEY);
-      return res.json(payments);
+      const cust = await asaas(`/customers?cpfCnpj=${cpf}`, 'GET', null, key);
+      if (!cust.data || cust.data.length === 0) return res.json({ data: [] });
+      const p = await asaas(`/payments?customer=${cust.data[0].id}&status=RECEIVED`, 'GET', null, key);
+      return res.json(p);
     }
-
-    return res.status(400).json({ error: 'Ação desconhecida' });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 };
 
 async function asaas(endpoint, method, body, key) {
-  const options = { 
-    method, 
-    headers: { 'Content-Type': 'application/json', 'access_token': key } 
-  };
-  if (body) options.body = JSON.stringify(body);
-  const r = await fetch(ASAAS_BASE + endpoint, options);
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.errors?.[0]?.description || 'Erro na API do Asaas');
-  return data;
+  const opt = { method, headers: { 'Content-Type': 'application/json', 'access_token': key } };
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(ASAAS_BASE + endpoint, opt);
+  const res = await r.json();
+  if (!r.ok) throw new Error(res.errors?.[0]?.description || 'Erro técnico no Asaas');
+  return res;
 }
