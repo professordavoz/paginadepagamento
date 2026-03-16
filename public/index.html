@@ -1,73 +1,95 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Academia da Voz — Checkout</title>
-  <style>
-    body { font-family: sans-serif; background: #0f0f1a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { background: #1a1a2e; padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; }
-    input { width: 100%; padding: 10px; margin: 10px 0; background: #000; color: #fff; border: 1px solid #333; }
-    button { width: 100%; padding: 12px; background: #00d4aa; border: none; font-weight: bold; cursor: pointer; }
-    #status { margin-top: 15px; text-align: center; font-size: 14px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>Academia da Voz — Checkout</title>
+    <style>
+        body { font-family: sans-serif; background: #0f0f1a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: #1a1a2e; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #0a0a1a; color: #fff; border: 1px solid #333; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 14px; background: #00d4aa; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; color: #000; }
+        #status { margin-top: 20px; text-align: center; font-size: 14px; min-height: 20px; }
+    </style>
 </head>
 <body>
 <div class="card">
-  <h2>Academia da Voz</h2>
-  <p>Valor: R$ 35,00</p>
-  <div id="form">
-    <input type="text" id="nome" placeholder="Nome Completo">
-    <input type="email" id="email" placeholder="E-mail">
-    <input type="text" id="cpf" placeholder="CPF" maxlength="14">
-    <button id="btn" onclick="processar()">Finalizar Compra</button>
-  </div>
-  <div id="status"></div>
+    <h2 style="margin-top: 0;">Academia da Voz</h2>
+    <p style="color: #00d4aa; font-weight: bold;">Valor único: R$ 35,00</p>
+    <div id="form-box">
+        <input type="text" id="nome" placeholder="Nome Completo">
+        <input type="email" id="email" placeholder="E-mail">
+        <input type="text" id="cpf" placeholder="CPF (apenas números)" maxlength="14">
+        <button id="btn-pagar" onclick="executarFluxo()">Pagar com PIX</button>
+    </div>
+    <div id="status"></div>
 </div>
 
 <script>
-  // LINK REAL DA SUA LOVABLE
-  const URL_SUCESSO = "https://vocal-divine-flow.lovable.app/obrigado/";
+    const LINK_CURSO = "https://vocal-divine-flow.lovable.app/obrigado/";
 
-  async function processar() {
-    const status = document.getElementById('status');
-    const cpfLimpo = document.getElementById('cpf').value.replace(/\D/g, '');
-    const email = document.getElementById('email').value;
+    async function executarFluxo() {
+        const statusEl = document.getElementById('status');
+        const btn = document.getElementById('btn-pagar');
+        const nome = document.getElementById('nome').value;
+        const email = document.getElementById('email').value;
+        const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
 
-    if (!cpfLimpo || !email) { status.innerHTML = "Preencha CPF e E-mail!"; return; }
-    
-    status.innerHTML = "Processando...";
-    
-    try {
-      // 1. Verifica se já pagou (Para você testar sem gastar de novo)
-      const busca = await call({ action: 'check_global', payload: { cpfCnpj: cpfLimpo } });
-      if (JSON.stringify(busca).includes('RECEIVED')) { window.location.replace(URL_SUCESSO); return; }
+        if (!cpf || !email) { statusEl.innerHTML = "❌ Erro: CPF e E-mail são obrigatórios!"; return; }
+        
+        btn.disabled = true;
+        statusEl.innerHTML = "⏳ Verificando dados...";
 
-      // 2. Cria ou recupera cliente
-      const cli = await call({ action: 'create_customer', payload: { name: document.getElementById('nome').value, email, cpfCnpj: cpfLimpo } });
-      
-      // 3. Gera Cobrança
-      const pag = await call({ action: 'create_payment', payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date().toISOString().split('T')[0], externalReference: email } });
-      
-      // 4. Gera QR Code
-      const qr = await call({ action: 'pix_qrcode', payload: { paymentId: pag.id } });
+        try {
+            // 1. Verifica se já tem pagamento aprovado
+            const checkGlobal = await disparar({ action: 'check_global', payload: { cpfCnpj: cpf } });
+            if (JSON.stringify(checkGlobal).includes('RECEIVED')) {
+                statusEl.innerHTML = "✅ Pagamento identificado! Redirecionando...";
+                window.location.replace(LINK_CURSO);
+                return;
+            }
 
-      document.getElementById('form').innerHTML = `
-        <img src="data:image/png;base64,${qr.encodedImage}" style="width:100%">
-        <p style="font-size:10px; word-break:break-all;">${qr.payload}</p>
-        <p>Aguardando pagamento...</p>`;
-      
-      setInterval(async () => {
-        const check = await call({ action: 'check_status', payload: { paymentId: pag.id } });
-        if (check.status === 'RECEIVED') window.location.replace(URL_SUCESSO);
-      }, 5000);
+            // 2. Cria ou busca cliente
+            statusEl.innerHTML = "⏳ Gerando seu acesso...";
+            const cliente = await disparar({ action: 'create_customer', payload: { name: nome || email, email: email, cpfCnpj: cpf } });
+            
+            // 3. Cria cobrança
+            const cobranca = await disparar({ 
+                action: 'create_payment', 
+                payload: { customer: cliente.id, billingType: 'PIX', value: 35.00, dueDate: new Date().toISOString().split('T')[0], externalReference: email } 
+            });
+            
+            // 4. Pega QR Code
+            const pix = await disparar({ action: 'pix_qrcode', payload: { paymentId: cobranca.id } });
 
-    } catch (e) { status.innerHTML = "Erro: " + e.message; }
-  }
+            document.getElementById('form-box').innerHTML = `
+                <div style="text-align:center; background:#fff; padding:15px; border-radius:8px;">
+                    <img src="data:image/png;base64,${pix.encodedImage}" style="width:100%; max-width:200px;">
+                    <p style="color:#000; font-size:10px; word-break:break-all; background:#eee; padding:5px;">${pix.payload}</p>
+                    <p style="color:#0066cc; font-weight:bold;">Aguardando pagamento...</p>
+                </div>`;
+            
+            // Vigia o pagamento
+            setInterval(async () => {
+                const statusPix = await disparar({ action: 'check_status', payload: { paymentId: cobranca.id } });
+                if (statusPix.status === 'RECEIVED' || statusPix.status === 'CONFIRMED') window.location.replace(LINK_CURSO);
+            }, 5000);
 
-  async function call(body) {
-    const r = await fetch('/api/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    return await r.json();
-  }
+        } catch (e) {
+            statusEl.innerHTML = "❌ Erro: " + e.message;
+            btn.disabled = false;
+        }
+    }
+
+    async function disparar(dados) {
+        const resposta = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
+        const json = await resposta.json();
+        if (!resposta.ok) throw new Error(json.error || 'Erro no servidor');
+        return json;
+    }
 </script>
 </body>
 </html>
