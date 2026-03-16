@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/", "destination": "/public/index.html" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/obrigado", "destination": "/public/obrigado.html" }
+    { "source": "/obrigado", "destination": "/public/obrigado.html" },
+    { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
