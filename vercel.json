@@ -1,15 +1,12 @@
 {
   "version": 2,
-  "outputDirectory": "public",
-  "functions": {
-    "api/**/*.js": {
-      "memory": 512,
-      "maxDuration": 30
-    }
-  },
+  "builds": [
+    { "src": "public/**", "use": "@vercel/static" },
+    { "src": "api/**/*.js", "use": "@vercel/node" }
+  ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/obrigado", "dest": "/obrigado.html" },
-    { "src": "/(.*)", "dest": "/$1" }
+    { "src": "/obrigado", "dest": "/public/obrigado.html" },
+    { "src": "/", "dest": "/public/index.html" }
   ]
 }
