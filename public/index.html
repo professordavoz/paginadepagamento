@@ -2,92 +2,89 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Academia da Voz — Checkout</title>
+    <title>Checkout — Academia da Voz</title>
     <style>
         body { font-family: sans-serif; background: #0f0f1a; color: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-        .card { background: #1a1a2e; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        input { width: 100%; padding: 12px; margin: 10px 0; background: #0a0a1a; color: #fff; border: 1px solid #333; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 14px; background: #00d4aa; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; color: #000; }
-        #status { margin-top: 20px; text-align: center; font-size: 14px; min-height: 20px; }
+        .box { background: #1a1a2e; padding: 30px; border-radius: 12px; width: 350px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #000; color: #fff; border: 1px solid #333; border-radius: 5px; }
+        button { width: 100%; padding: 15px; background: #00d4aa; color: #000; font-weight: bold; border: none; cursor: pointer; border-radius: 5px; }
+        #log { font-size: 13px; margin-top: 15px; }
+        .aviso { background: #444400; border: 1px solid #ffff00; padding: 15px; border-radius: 8px; color: #ffff00; }
     </style>
 </head>
 <body>
-<div class="card">
-    <h2 style="margin-top: 0;">Academia da Voz</h2>
-    <p style="color: #00d4aa; font-weight: bold;">Valor único: R$ 35,00</p>
-    <div id="form-box">
-        <input type="text" id="nome" placeholder="Nome Completo">
-        <input type="email" id="email" placeholder="E-mail">
-        <input type="text" id="cpf" placeholder="CPF (apenas números)" maxlength="14">
-        <button id="btn-pagar" onclick="executarFluxo()">Pagar com PIX</button>
+<div class="box">
+    <h2>Academia da Voz</h2>
+    <div id="form-area">
+        <input type="text" id="nome" placeholder="Seu Nome">
+        <input type="email" id="email" placeholder="Seu E-mail">
+        <input type="text" id="cpf" placeholder="CPF (Apenas números)" maxlength="11">
+        <button onclick="iniciar()">Pagar R$ 35,00</button>
     </div>
-    <div id="status"></div>
+    <div id="log"></div>
 </div>
 
 <script>
-    const LINK_CURSO = "https://vocal-divine-flow.lovable.app/obrigado/";
+    // AJUSTADO: Agora aponta para o seu arquivo local na pasta public
+    const URL_OBRIGADO = "/obrigado.html"; 
 
-    async function executarFluxo() {
-        const statusEl = document.getElementById('status');
-        const btn = document.getElementById('btn-pagar');
-        const nome = document.getElementById('nome').value;
-        const email = document.getElementById('email').value;
+    async function iniciar() {
+        const log = document.getElementById('log');
+        const form = document.getElementById('form-area');
         const cpf = document.getElementById('cpf').value.replace(/\D/g, '');
+        const email = document.getElementById('email').value;
 
-        if (!cpf || !email) { statusEl.innerHTML = "❌ Erro: CPF e E-mail são obrigatórios!"; return; }
+        if (cpf.length < 11 || !email) { log.innerHTML = "<span style='color:red'>Preencha os dados corretamente!</span>"; return; }
         
-        btn.disabled = true;
-        statusEl.innerHTML = "⏳ Verificando dados...";
+        log.innerHTML = "Processando...";
 
         try {
-            // 1. Verifica se já tem pagamento aprovado
-            const checkGlobal = await disparar({ action: 'check_global', payload: { cpfCnpj: cpf } });
-            if (JSON.stringify(checkGlobal).includes('RECEIVED')) {
-                statusEl.innerHTML = "✅ Pagamento identificado! Redirecionando...";
-                window.location.replace(LINK_CURSO);
+            // Verifica se o aluno já pagou
+            const check = await api({ action: 'check_global', payload: { cpfCnpj: cpf } });
+            
+            if (JSON.stringify(check).includes('RECEIVED')) {
+                form.innerHTML = ""; 
+                log.innerHTML = `
+                    <div class="aviso">
+                        <b>Pagamento já identificado!</b><br><br>
+                        Você já possui acesso ao curso.<br>
+                        Dúvidas? Entre em contato:<br>
+                        <span style="font-size:16px;"><b>11 94319-0310</b></span>
+                    </div>`;
                 return;
             }
 
-            // 2. Cria ou busca cliente
-            statusEl.innerHTML = "⏳ Gerando seu acesso...";
-            const cliente = await disparar({ action: 'create_customer', payload: { name: nome || email, email: email, cpfCnpj: cpf } });
-            
-            // 3. Cria cobrança
-            const cobranca = await disparar({ 
-                action: 'create_payment', 
-                payload: { customer: cliente.id, billingType: 'PIX', value: 35.00, dueDate: new Date().toISOString().split('T')[0], externalReference: email } 
-            });
-            
-            // 4. Pega QR Code
-            const pix = await disparar({ action: 'pix_qrcode', payload: { paymentId: cobranca.id } });
+            // Segue o fluxo de cobrança
+            const cli = await api({ action: 'create_customer', payload: { name: document.getElementById('nome').value || email, email, cpfCnpj: cpf } });
+            const pag = await api({ action: 'create_payment', payload: { customer: cli.id, billingType: 'PIX', value: 35.00, dueDate: new Date().toISOString().split('T')[0], externalReference: email } });
+            const pix = await api({ action: 'pix_qrcode', payload: { paymentId: pag.id } });
 
-            document.getElementById('form-box').innerHTML = `
-                <div style="text-align:center; background:#fff; padding:15px; border-radius:8px;">
-                    <img src="data:image/png;base64,${pix.encodedImage}" style="width:100%; max-width:200px;">
-                    <p style="color:#000; font-size:10px; word-break:break-all; background:#eee; padding:5px;">${pix.payload}</p>
-                    <p style="color:#0066cc; font-weight:bold;">Aguardando pagamento...</p>
-                </div>`;
-            
-            // Vigia o pagamento
+            form.innerHTML = `
+                <div style="background:#fff; padding:10px; border-radius:8px;">
+                    <img src="data:image/png;base64,${pix.encodedImage}" style="width:100%">
+                    <p style="font-size:9px; color:#333; word-break:break-all;">${pix.payload}</p>
+                </div>
+                <p style="color:#00d4aa; margin-top:10px;">Aguardando pagamento PIX...</p>`;
+            log.innerHTML = "";
+
             setInterval(async () => {
-                const statusPix = await disparar({ action: 'check_status', payload: { paymentId: cobranca.id } });
-                if (statusPix.status === 'RECEIVED' || statusPix.status === 'CONFIRMED') window.location.replace(LINK_CURSO);
+                const s = await api({ action: 'check_status', payload: { paymentId: pag.id } });
+                if (s.status === 'RECEIVED' || s.status === 'CONFIRMED') window.location.href = URL_OBRIGADO;
             }, 5000);
 
-        } catch (e) {
-            statusEl.innerHTML = "❌ Erro: " + e.message;
-            btn.disabled = false;
+        } catch (e) { 
+            log.innerHTML = "<span style='color:red'>ERRO: " + e.message + "</span>"; 
         }
     }
 
-    async function disparar(dados) {
-        const resposta = await fetch('/api/checkout', {
+    async function api(corpo) {
+        const r = await fetch('/api/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(dados)
+            body: JSON.stringify(corpo)
         });
-        const json = await resposta.json();
-        if (!resposta.ok) throw new Error(json.error || 'Erro no servidor');
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error || "Erro de conexão");
         return json;
     }
 </script>
