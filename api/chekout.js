@@ -1,5 +1,4 @@
-const ASAAS_ENV = process.env.ASAAS_ENV || 'production';
-const ASAAS_BASE = ASAAS_ENV === 'production' 
+const ASAAS_BASE = (process.env.ASAAS_ENV === 'production') 
   ? 'https://api.asaas.com/v3' 
   : 'https://sandbox.asaas.com/api/v3';
 
@@ -11,15 +10,16 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
-  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada' });
+  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada na Vercel' });
 
+  // BUG DO CPF CORRIGIDO: Garante que o body seja lido corretamente
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) {} }
   const { action, payload } = body || {};
 
   try {
     if (action === 'create_customer') {
-      // BUSCA O CLIENTE PELO CPF ANTES DE TENTAR CRIAR UM NOVO
+      // BUSCA ANTES DE CRIAR: Evita o erro de CPF já existente
       const busca = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, ASAAS_API_KEY);
       if (busca.data && busca.data.length > 0) return res.json(busca.data[0]);
       
@@ -47,7 +47,7 @@ module.exports = async function handler(req, res) {
       return res.json(payments);
     }
 
-    return res.status(400).json({ error: 'Ação desconhecida' });
+    return res.status(400).json({ error: 'Acao desconhecida' });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -58,6 +58,6 @@ async function asaas(endpoint, method, body, key) {
   if (body) options.body = JSON.stringify(body);
   const r = await fetch(ASAAS_BASE + endpoint, options);
   const data = await r.json();
-  if (!r.ok) throw new Error(data.errors?.[0]?.description || 'Erro na API');
+  if (!r.ok) throw new Error(data.errors?.[0]?.description || 'Erro no Asaas');
   return data;
 }
