@@ -1,12 +1,5 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "public/**", "use": "@vercel/static" },
-    { "src": "api/**/*.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/obrigado", "dest": "/public/obrigado.html" },
-    { "src": "/", "dest": "/public/index.html" }
-  ]
+  "name": "academia-da-voz-checkout",
+  "version": "1.0.0",
+  "dependencies": {}
 }
