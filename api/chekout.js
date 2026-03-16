@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY;
-  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Falta ASAAS_API_KEY na Vercel' });
+  if (!ASAAS_API_KEY) return res.status(500).json({ error: 'Chave API não configurada' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) {} }
@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
 
   try {
     if (action === 'create_customer') {
-      // PROCURA O CLIENTE ANTES DE CRIAR (Evita erro de CPF duplicado)
+      // BUSCA O CLIENTE PELO CPF ANTES DE TENTAR CRIAR UM NOVO
       const busca = await asaas(`/customers?cpfCnpj=${payload.cpfCnpj}`, 'GET', null, ASAAS_API_KEY);
       if (busca.data && busca.data.length > 0) return res.json(busca.data[0]);
       
